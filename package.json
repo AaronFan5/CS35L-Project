@@ -1,0 +1,12 @@
+{
+  "name": "cs35l-project",
+  "version": "1.0.0",
+  "description": "Simple Express server for local development",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.4"
+  }
+}
