@@ -20,6 +20,7 @@ app.get('/dashboard', (req, res) => {
   res.send(`
     <h1>You have logged in.</h1>
     <p>THIS WILL BE WHERE THE MAIN STUFF ON THE WEBSITE GOES!</p>
+    <a href = "/"><button>Log Out</button></a>
     `)
 });
 
