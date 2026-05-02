@@ -79,7 +79,12 @@ function renderReactPage(type) {
                 if (!response.ok) {
                   throw new Error(data.message || 'Submit failed');
                 }
+
+                if(pageType == "login"){
+                window.location.href = '/dashboard';
+                } else{
                 setResult(data);
+                } 
               } catch (err) {
                 setError(err.message);
               }
