@@ -81,7 +81,7 @@ function renderReactPage(type) {
                 }
 
                 if(pageType == "login"){
-                window.location.href = '/dashboard';
+                window.location.href = '/dashboard?username=' + encodeURIComponent(data.username);
                 } else{
                 setResult(data);
                 } 

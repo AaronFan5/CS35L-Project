@@ -5,7 +5,7 @@
     "options": [
       {
         "text": "a",
-        "votes": 0
+        "votes": 1
       },
       {
         "text": "b",
@@ -16,5 +16,28 @@
         "votes": 0
       }
     ]
+  },
+  {
+    "id": "1778179926745",
+    "question": "Does this work?",
+    "options": [
+      {
+        "text": "a",
+        "votes": 0
+      },
+      {
+        "text": "b",
+        "votes": 0
+      },
+      {
+        "text": "c",
+        "votes": 0
+      },
+      {
+        "text": "d",
+        "votes": 0
+      }
+    ],
+    "creator": "Guest"
   }
 ]

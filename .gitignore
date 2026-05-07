@@ -1,3 +1,5 @@
 node_modules/
 data/users.json
+data/votes.json
+data/polls.json
 .DS_Store
