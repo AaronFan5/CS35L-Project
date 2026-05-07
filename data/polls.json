@@ -5,7 +5,7 @@
     "options": [
       {
         "text": "a",
-        "votes": 1
+        "votes": 0
       },
       {
         "text": "b",
@@ -39,5 +39,28 @@
       }
     ],
     "creator": "Guest"
+  },
+  {
+    "id": "1778187408144",
+    "question": "a",
+    "options": [
+      {
+        "text": "a",
+        "votes": 0
+      },
+      {
+        "text": "b",
+        "votes": 0
+      },
+      {
+        "text": "c",
+        "votes": 0
+      },
+      {
+        "text": "d",
+        "votes": 0
+      }
+    ],
+    "creator": "asingh07"
   }
 ]

@@ -8,6 +8,7 @@ router.get('/', (req, res) => {
         <html lang="en">
             <head>
                 <title>Polls</title>
+                <link rel="stylesheet" href="/styles.css">
                 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
                 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
                 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -22,11 +23,23 @@ router.get('/', (req, res) => {
                         const [polls, setPolls] = useState([]);
                         const [question, setQuestion] = useState('');
                         const [options, setOptions] = useState('');
+                        const [userVotes, setUserVotes] = useState({});
 
                         useEffect(() => {
                             fetch('/polls/all')
                                 .then(res => res.json())
                                 .then(data => setPolls(data));
+                            
+                            // Fetch user's votes
+                            fetch('/polls/user-votes?username=' + encodeURIComponent(currentUser))
+                                .then(res => res.json())
+                                .then(votes => {
+                                    const votesMap = {};
+                                    votes.forEach(vote => {
+                                        votesMap[vote.pollId] = vote.optionIndex;
+                                    });
+                                    setUserVotes(votesMap);
+                                });
                         }, []);
 
                         const createPoll = async () => {
@@ -55,6 +68,17 @@ router.get('/', (req, res) => {
                             }
                             const updatedPolls = polls.map(p => p.id === pollId ? data : p);
                             setPolls(updatedPolls);
+                            
+                            // Update user votes state
+                            const newUserVotes = { ...userVotes };
+                            if (userVotes[pollId] === optionIndex) {
+                                // User unvoted - remove from userVotes
+                                delete newUserVotes[pollId];
+                            } else {
+                                // User voted - add/update userVotes
+                                newUserVotes[pollId] = optionIndex;
+                            }
+                            setUserVotes(newUserVotes);
                         };
 
                         return (
@@ -74,7 +98,13 @@ router.get('/', (req, res) => {
                                         <h4>{poll.question}</h4>
                                         <p>Created by: {poll.creator}</p>
                                         {poll.options.map((opt, idx) => (
-                                            <button key={idx} onClick={() => handleVote(poll.id, idx)}>{opt.text} ({opt.votes})</button>
+                                            <button 
+                                                key={idx} 
+                                                onClick={() => handleVote(poll.id, idx)}
+                                                className={userVotes[poll.id] === idx ? 'voted-option' : ''}
+                                            >
+                                                {opt.text} ({opt.votes})
+                                            </button>
                                         ))}
                                     </div>
                                 ))}

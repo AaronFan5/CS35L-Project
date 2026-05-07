@@ -7,6 +7,7 @@ const port = process.env.PORT || 3000;
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(express.static('public'));
 app.use('/auth', authRouter);
 app.use('/polls', pollsRouter);
 app.use('/dashboard', dashboardRouter);
