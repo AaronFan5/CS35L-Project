@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const authRouter = require('./routes/auth');
 const pollsRouter = require('./routes/polls');
 const dashboardRouter = require('./routes/dashboard');
@@ -13,12 +14,7 @@ app.use('/polls', pollsRouter);
 app.use('/dashboard', dashboardRouter);
 
 app.get('/', (req, res) => {
-  res.send(`
-    <h1>Welcome to (figure out app name later)</h1>
-    <p>Please log-in or sign up</p>
-    <a href = "/auth/login"><button>Login</button></a>
-    <a href = "/auth/signup"><button>Sign up</button></a>
-    `);
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(port, () => {
