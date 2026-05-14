@@ -17,11 +17,16 @@ body {
 }
 
 .poll-card {
+    display: block;
+    width: 100%;
+    text-align: left;
     margin: 15px 0;
     padding: 15px;
     border: 1px solid #ddd;
     border-radius: 8px;
     background-color: white;
+    color: black;
+    cursor: pointer;
 }
 
 .poll-card h4 {
@@ -34,7 +39,32 @@ body {
     font-size: 14px;
 }
 
-.poll-card button {
+.poll-card:hover,
+.selected-poll {
+    border-color: #007bff;
+    background-color: #f3f8ff;
+}
+
+.poll-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(300px, 2fr);
+    gap: 20px;
+    align-items: start;
+}
+
+.poll-detail {
+    margin: 15px 0;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: white;
+}
+
+.poll-detail h2 {
+    margin-top: 0;
+}
+
+.poll-options button {
     margin: 5px 5px 5px 0;
     padding: 8px 12px;
     border: 1px solid #ddd;
@@ -45,8 +75,46 @@ body {
     font-size: 14px;
 }
 
-.poll-card button:hover {
+.poll-options button:hover {
     background-color: #f0f0f0;
+}
+
+.poll-chart {
+    margin-top: 20px;
+}
+
+.chart-row {
+    display: grid;
+    grid-template-columns: minmax(90px, 150px) 1fr 40px;
+    gap: 10px;
+    align-items: center;
+    margin: 10px 0;
+}
+
+.chart-label {
+    overflow-wrap: anywhere;
+}
+
+.chart-track {
+    height: 18px;
+    overflow: hidden;
+    border-radius: 4px;
+    background-color: #e5e7eb;
+}
+
+.chart-bar {
+    height: 100%;
+    background-color: #007bff;
+}
+
+.chart-count {
+    text-align: right;
+}
+
+@media (max-width: 700px) {
+    .poll-layout {
+        grid-template-columns: 1fr;
+    }
 }
 
 input {

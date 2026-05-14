@@ -24,119 +24,6 @@ function findUser(username, email) {
   return users.find((user) => user.username === username || user.email === email);
 }
 
-function renderReactPage(type) {
-  const title = type === 'signup' ? 'Sign Up' : 'Login';
-  const headline = type === 'signup' ? 'Create your account' : 'Sign in to your account';
-  const action = type;
-  return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>${title}</title>
-        <style>
-          body { font-family: Arial, sans-serif; padding: 20px; }
-          label { display: block; margin-top: 12px; }
-          input, button { font-size: 16px; margin-top: 6px; }
-          button { padding: 10px 14px; }
-          a { color: blue; }
-        </style>
-        <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-        <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-        <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-      </head>
-      <body>
-        <div>
-          <div id="root"></div>
-        </div>
-        <script type="text/babel">
-          const pageType = '${type}';
-          const pageTitle = '${title}';
-          const pageHeadline = '${headline}';
-          const { useState } = React;
-
-          function AuthForm() {
-            const [name, setName] = useState('');
-            const [email, setEmail] = useState('');
-            const [username, setUsername] = useState('');
-            const [password, setPassword] = useState('');
-            const [result, setResult] = useState(null);
-            const [error, setError] = useState('');
-
-            const handleSubmit = async (event) => {
-              event.preventDefault();
-              setError('');
-              setResult(null);
-
-              try {
-                const response = await fetch('/auth/${action}', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ name, email, username, password })
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                  throw new Error(data.message || 'Submit failed');
-                }
-
-                if(pageType == "login"){
-                window.location.href = '/dashboard?username=' + encodeURIComponent(data.username);
-                } else{
-                setResult(data);
-                } 
-              } catch (err) {
-                setError(err.message);
-              }
-            };
-
-            return (
-              <div>
-                <h1>{pageTitle}</h1>
-                <p>{pageHeadline}</p>
-                <form onSubmit={handleSubmit}>
-                  <div>
-                    <label htmlFor="name">Name</label>
-                    <input id="name" value={name} onChange={(e) => setName(e.target.value)} type="text" placeholder="Name" required />
-                  </div>
-                  <div>
-                    <label htmlFor="email">Email</label>
-                    <input id="email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" required />
-                  </div>
-                  <div>
-                    <label htmlFor="username">Username</label>
-                    <input id="username" value={username} onChange={(e) => setUsername(e.target.value)} type="text" placeholder="Username" required />
-                  </div>
-                  <div>
-                    <label htmlFor="password">Password</label>
-                    <input id="password" value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Password" required />
-                  </div>
-                  <button type="submit">${title}</button>
-                </form>
-                <div>
-                  {pageType === 'signup' ? <span>Already have an account? <a href="/auth/login">Login</a></span> : <span>Need an account? <a href="/auth/signup">Sign up</a></span>}
-                </div>
-                {error && <div>{error}</div>}
-                {result && (
-                  <div>
-                    <strong>{result.type === 'signup' ? 'Signup Received' : 'Login Received'}</strong>
-                    <p>Name: {result.name}</p>
-                    <p>Email: {result.email}</p>
-                    <p>Username: {result.username}</p>
-                    <p>Password: {result.password}</p>
-                  </div>
-                )}
-              </div>
-            );
-          }
-
-          ReactDOM.createRoot(document.getElementById('root')).render(<AuthForm />);
-        </script>
-      </body>
-    </html>
-  `;
-}
-
 function resultResponse(type, data) {
   return {
     type,
@@ -148,7 +35,7 @@ function resultResponse(type, data) {
 }
 
 router.get('/login', (req, res) => {
-  res.send(renderReactPage('login'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'login.html'));
 });
 
 router.post('/login', (req, res) => {
@@ -162,7 +49,7 @@ router.post('/login', (req, res) => {
 });
 
 router.get('/signup', (req, res) => {
-  res.send(renderReactPage('signup'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'signup.html'));
 });
 
 router.post('/signup', (req, res) => {
