@@ -20,6 +20,20 @@ router.post('/create', (req, res) => {
   res.json(newPoll);
 });
 
+router.post('/delete', (req, res) => {
+  const { pollId, username } = req.body;
+  if(!pollId || !username) {
+    return res.status(400).json({ message: 'Poll ID and Username Required' });
+  }
+
+  const result = pollService.deletePoll(pollId, username);
+  if(result.error) {
+    return res.status(result.status).json({ message: result.error });
+  }
+  
+  res.json({ message: 'Poll Deleted'});
+});
+
 router.post('/vote', (req, res) => {
   const { username } = req.body;
 

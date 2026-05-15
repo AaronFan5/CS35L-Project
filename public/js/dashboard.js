@@ -8,9 +8,11 @@ function Dashboard() {
   const [options, setOptions] = useState('');
   const [userVotes, setUserVotes] = useState({});
   const [selectedPollId, setSelectedPollId] = useState(null);
+  const [category, setCategory] = useState('Opinion');
+  const [activeFilter, setActiveFilter] = useState('All');
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
-
+  const filteredPolls = activeFilter === 'All' ? polls : polls.filter(poll => poll.category === activeFilter);
   useEffect(() => {
     fetch('/polls/all')
       .then((response) => response.json())
@@ -32,18 +34,41 @@ function Dashboard() {
       });
   }, []);
 
+  useEffect(() => {
+    if(filteredPolls.length > 0 && !filteredPolls.find(poll => poll.id === selectedPollId)){
+      setSelectedPollId(filteredPolls[0].id);
+    }
+  }, [activeFilter, polls]);
+
   const createPoll = async () => {
     const optionsArray = options.split(',').map((option) => option.trim());
     const response = await fetch('/polls/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, options: optionsArray, creator: currentUser })
+      body: JSON.stringify({ question, options: optionsArray, creator: currentUser, category })
     });
     const newPoll = await response.json();
     setPolls([...polls, newPoll]);
     setSelectedPollId(newPoll.id);
     setQuestion('');
     setOptions('');
+  };
+
+  const deletePoll = async (pollId) => {
+    const response = await fetch('/polls/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pollId, username: currentUser })
+    });
+    if(response.ok){
+      const updatedPolls = polls.filter(poll => poll.id !== pollId);
+      setPolls(updatedPolls);
+      if(selectedPollId === pollId && updatedPolls.length > 0){
+        setSelectedPollId(updatedPolls[0].id);
+      } else if(updatedPolls.length === 0){
+        setSelectedPollId(null);
+      }
+    }
   };
 
   const handleVote = async (pollId, optionIndex) => {
@@ -100,13 +125,33 @@ function Dashboard() {
         <h2>Create a New Poll</h2>
         <input placeholder="Question" value={question} onChange={(event) => setQuestion(event.target.value)} /><br />
         <input placeholder="Options (comma separated)" value={options} onChange={(event) => setOptions(event.target.value)} /><br />
+
+        <label>Category:</label>
+        <select value={category} onChange={(event) => setCategory(event.target.value)}>
+          <option value="Food">Food</option>
+          <option value="Location">Location</option>
+          <option value="Opinion">Opinion</option>
+        </select><br />
+
         <button onClick={createPoll}>Create Poll</button>
-      </div>
+    </div>
+
+    <div className="filter-buttons" style={{ margin: '20px 0' }}>
+      {['All', 'Food', 'Location', 'Opinion'].map(tab => (
+        <button
+          key={tab}
+          onClick={() => setActiveFilter(tab)}
+          style={{ fontWeight: activeFilter === tab ? 'bold' : 'normal', marginRight: '10px' }}
+          >
+            {tab.toUpperCase()}
+          </button>
+      ))}
+    </div>
 
       <h2>Polls</h2>
       <div className="poll-layout">
         <div className="poll-list">
-          {polls.map((poll) => (
+          {filteredPolls.map((poll) => (
             <button
               key={poll.id}
               type="button"
@@ -122,8 +167,11 @@ function Dashboard() {
         {selectedPoll && (
           <div className="poll-detail">
             <h2>{selectedPoll.question}</h2>
-            <p>Created by: {selectedPoll.creator}</p>
+            {selectedPoll.creator === currentUser && (
+              <button onClick={() => deletePoll(selectedPoll.id)} style={{ color: 'red', marginBottom: '10px' }}>Delete Poll</button>
+            )}
 
+            <p>Category: <strong>{selectedPoll.category}</strong> | Created by: {selectedPoll.creator}</p>
             <div className="poll-options">
               {selectedPoll.options.map((option, index) => (
                 <button
@@ -135,14 +183,17 @@ function Dashboard() {
                 </button>
               ))}
             </div>
-
             {renderPollChart(selectedPoll)}
           </div>
         )}
 
-        {!selectedPoll && polls.length === 0 && (
-          <p>No polls yet.</p>
-        )}
+
+      {filteredPolls.length === 0 && (
+          <div className = "poll-detail">
+            <h2>No polls available in this category.</h2>
+          </div>
+        )
+      }
       </div>
     </div>
   );

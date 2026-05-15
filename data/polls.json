@@ -27,7 +27,7 @@
       },
       {
         "text": "b",
-        "votes": 0
+        "votes": 1
       },
       {
         "text": "c",
@@ -46,7 +46,7 @@
     "options": [
       {
         "text": "a",
-        "votes": 0
+        "votes": 1
       },
       {
         "text": "b",
@@ -62,5 +62,60 @@
       }
     ],
     "creator": "asingh07"
+  },
+  {
+    "id": "1778278477153",
+    "question": "it does work!",
+    "options": [
+      {
+        "text": "good job",
+        "votes": 0
+      }
+    ],
+    "creator": "Aaron"
+  },
+  {
+    "id": "1778876579153",
+    "question": "",
+    "options": [
+      {
+        "text": "",
+        "votes": 1
+      }
+    ],
+    "creator": "Aaron",
+    "category": "Food"
+  },
+  {
+    "id": "1778876599003",
+    "question": "banana",
+    "options": [
+      {
+        "text": "a",
+        "votes": 0
+      },
+      {
+        "text": "b",
+        "votes": 0
+      },
+      {
+        "text": "c",
+        "votes": 0
+      }
+    ],
+    "creator": "Aaron",
+    "category": "Food"
+  },
+  {
+    "id": "1778877075167",
+    "question": "asd",
+    "options": [
+      {
+        "text": "1",
+        "votes": 0
+      }
+    ],
+    "creator": "Aaron",
+    "category": "Location"
   }
 ]

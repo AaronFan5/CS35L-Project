@@ -41,18 +41,41 @@ function getUserVotes(username) {
   return loadVotes().filter((vote) => vote.username === username);
 }
 
-function createPoll({ question, options, creator }) {
+function createPoll({ question, options, creator, category }) {
   const polls = loadPolls();
   const newPoll = {
     id: Date.now().toString(),
     question,
     options: options.map((option) => ({ text: option, votes: 0 })),
-    creator
+    creator,
+    category: category || 'Opinion'
   };
 
   polls.push(newPoll);
   savePolls(polls);
   return newPoll;
+}
+
+function deletePoll(pollId, username) {
+  const polls = loadPolls();
+  const poll = polls.find(p => p.id === pollId);
+
+  if(!poll){
+    return { status: 404, error: 'Poll not found' };
+  }
+
+  if(poll.creator !== username) {
+    return {status: 403, error: 'Only the creator can delete this poll.'};
+}
+
+  const updatedPolls = polls.filter(p => p.id !== pollId);
+  savePolls(updatedPolls);
+
+  const votes = loadVotes();
+  const updatedVotes = votes.filter(vote => vote.pollId !== pollId);
+  saveVotes(updatedVotes);
+
+  return {};
 }
 
 function voteOnPoll({ pollId, optionIndex, username }) {
@@ -94,5 +117,6 @@ module.exports = {
   createPoll,
   getAllPolls,
   getUserVotes,
-  voteOnPoll
+  voteOnPoll,
+  deletePoll
 };
