@@ -1,4 +1,5 @@
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 const authRouter = require('./routes/auth');
 const pollsRouter = require('./routes/polls');
@@ -8,6 +9,7 @@ const port = process.env.PORT || 3000;
 
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.static('public'));
 app.use('/auth', authRouter);
 app.use('/polls', pollsRouter);

@@ -1,8 +1,7 @@
 const { useEffect, useState } = React;
-const params = new URLSearchParams(window.location.search);
-const currentUser = params.get('username') || 'Guest';
 
 function Dashboard() {
+  const [currentUser, setCurrentUser] = useState('Loading...');
   const [polls, setPolls] = useState([]);
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState('');
@@ -13,7 +12,33 @@ function Dashboard() {
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
   const filteredPolls = activeFilter === 'All' ? polls : polls.filter(poll => poll.category === activeFilter);
+
   useEffect(() => {
+    fetch('/auth/me')
+      .then((response) => {
+        if (!response.ok) {
+          window.location.href = '/auth/login';
+          throw new Error('Not authenticated');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setCurrentUser(data.username);
+        
+        return fetch('/polls/user-votes');
+      })
+      .then((response) => response.json())
+      .then((votes) => {
+        const votesMap = {};
+        if (Array.isArray(votes)) {
+            votes.forEach((vote) => {
+            votesMap[vote.pollId] = vote.optionIndex;
+            });
+        }
+        setUserVotes(votesMap);
+      })
+      .catch((error) => console.error('Auth error:', error));
+
     fetch('/polls/all')
       .then((response) => response.json())
       .then((data) => {
@@ -21,16 +46,6 @@ function Dashboard() {
         if (data.length > 0) {
           setSelectedPollId(data[0].id);
         }
-      });
-
-    fetch(`/polls/user-votes?username=${encodeURIComponent(currentUser)}`)
-      .then((response) => response.json())
-      .then((votes) => {
-        const votesMap = {};
-        votes.forEach((vote) => {
-          votesMap[vote.pollId] = vote.optionIndex;
-        });
-        setUserVotes(votesMap);
       });
   }, []);
 
@@ -45,7 +60,7 @@ function Dashboard() {
     const response = await fetch('/polls/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, options: optionsArray, creator: currentUser, category })
+      body: JSON.stringify({ question, options: optionsArray, category })
     });
     const newPoll = await response.json();
     setPolls([...polls, newPoll]);
@@ -58,7 +73,7 @@ function Dashboard() {
     const response = await fetch('/polls/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pollId, username: currentUser })
+      body: JSON.stringify({ pollId })
     });
     if(response.ok){
       const updatedPolls = polls.filter(poll => poll.id !== pollId);
@@ -75,7 +90,7 @@ function Dashboard() {
     const response = await fetch('/polls/vote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pollId, optionIndex, username: currentUser })
+      body: JSON.stringify({ pollId, optionIndex })
     });
     const data = await response.json();
 
@@ -93,6 +108,11 @@ function Dashboard() {
       newUserVotes[pollId] = optionIndex;
     }
     setUserVotes(newUserVotes);
+  };
+
+  const handleLogout = async () => {
+    await fetch('/auth/logout', { method: 'POST' });
+    window.location.href = '/';
   };
 
   const renderPollChart = (poll) => {
@@ -120,7 +140,8 @@ function Dashboard() {
   return (
     <div>
       <h1>Poll Dashboard - Welcome {currentUser}</h1>
-      <a href="/"><button>Log Out</button></a>
+      <button onClick={handleLogout} style={{ backgroundColor: '#dc3545' }}>Log Out</button>
+      
       <div className="create-poll">
         <h2>Create a New Poll</h2>
         <input placeholder="Question" value={question} onChange={(event) => setQuestion(event.target.value)} /><br />
@@ -134,19 +155,19 @@ function Dashboard() {
         </select><br />
 
         <button onClick={createPoll}>Create Poll</button>
-    </div>
+      </div>
 
-    <div className="filter-buttons" style={{ margin: '20px 0' }}>
-      {['All', 'Food', 'Location', 'Opinion'].map(tab => (
-        <button
-          key={tab}
-          onClick={() => setActiveFilter(tab)}
-          style={{ fontWeight: activeFilter === tab ? 'bold' : 'normal', marginRight: '10px' }}
-          >
-            {tab.toUpperCase()}
-          </button>
-      ))}
-    </div>
+      <div className="filter-buttons" style={{ margin: '20px 0' }}>
+        {['All', 'Food', 'Location', 'Opinion'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveFilter(tab)}
+            style={{ fontWeight: activeFilter === tab ? 'bold' : 'normal', marginRight: '10px' }}
+            >
+              {tab.toUpperCase()}
+            </button>
+        ))}
+      </div>
 
       <h2>Polls</h2>
       <div className="poll-layout">
@@ -187,13 +208,11 @@ function Dashboard() {
           </div>
         )}
 
-
-      {filteredPolls.length === 0 && (
-          <div className = "poll-detail">
+        {filteredPolls.length === 0 && (
+          <div className="poll-detail">
             <h2>No polls available in this category.</h2>
           </div>
-        )
-      }
+        )}
       </div>
     </div>
   );
