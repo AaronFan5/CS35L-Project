@@ -29,7 +29,7 @@ function AuthForm() {
       }
 
       if (pageType === 'login') {
-        window.location.href = `/dashboard?username=${encodeURIComponent(data.username)}`;
+        window.location.href = `/dashboard`;
       } else {
         setResult(data);
       }

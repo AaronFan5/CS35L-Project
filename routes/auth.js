@@ -1,6 +1,8 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const { requireAuth, SECRET_KEY } = require('../middleware/authMiddleware');
 const router = express.Router();
 
 const usersFile = path.join(__dirname, '..', 'data', 'users.json');
@@ -42,9 +44,18 @@ router.post('/login', (req, res) => {
   const { username, password } = req.body;
   const users = loadUsers();
   const user = users.find((userData) => userData.username === username && userData.password === password);
+  
   if (!user) {
     return res.status(400).json({ message: 'Invalid username or password' });
   }
+
+  const token = jwt.sign({ username: user.username }, SECRET_KEY, { expiresIn: '1h' });
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: false, 
+    maxAge: 3600000
+  });
+
   res.json(resultResponse('login', user));
 });
 
@@ -57,10 +68,32 @@ router.post('/signup', (req, res) => {
   if (findUser(username, email)) {
     return res.status(400).json({ message: 'Username or email already exists' });
   }
+  
   const users = loadUsers();
-  users.push({ name, email, username, password });
+  const newUser = { name, email, username, password };
+  users.push(newUser);
   saveUsers(users);
+
+// automatically log user in after signing up
+  const token = jwt.sign({ username: newUser.username }, SECRET_KEY, { expiresIn: '1h' });
+  res.cookie('token', token, {
+    httpOnly: true,
+    secure: false, 
+    maxAge: 3600000
+  });
+
   res.json(resultResponse('signup', req.body));
+});
+
+// route to securely check who is logged in
+router.get('/me', requireAuth, (req, res) => {
+  res.json({ username: req.user.username });
+});
+
+// route to log out (clears the cookie)
+router.post('/logout', (req, res) => {
+  res.clearCookie('token');
+  res.json({ message: 'Logged out successfully' });
 });
 
 module.exports = router;
