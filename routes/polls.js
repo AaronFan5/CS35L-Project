@@ -4,8 +4,8 @@ const { requireAuth } = require('../middleware/authMiddleware'); // import middl
 const router = express.Router();
 
 // anyone can view all polls
-router.get('/all', (req, res) => {
-  res.json(pollService.getAllPolls());
+router.get('/all', async (req, res) => {
+  res.json(await pollService.getAllPolls());
 });
 
 // protect all routes below this line

@@ -1,17 +1,42 @@
 const fs = require('fs');
 const path = require('path');
+const supabase = require('./supabaseClient');
 
 const pollsFile = path.join(__dirname, '..', 'data', 'polls.json');
 const votesFile = path.join(__dirname, '..', 'data', 'votes.json');
 
-function loadPolls() {
-  try {
-    const data = fs.readFileSync(pollsFile, 'utf8');
-    return JSON.parse(data || '[]');
-  } catch (error) {
-    console.error('Error loading polls:', error);
+async function loadPolls() {
+  const { data, error } = await supabase
+    .from('polls')
+    .select(`
+      id,
+      question,
+      category,
+      creator_username,
+      poll_options (
+        text,
+        votes,
+        option_index
+      )
+    `)
+    .order('created_at', { ascending: true })
+    .order('option_index', { foreignTable: 'poll_options', ascending: true });
+
+  if (error) {
+    console.error('Error loading polls:', error.message);
     return [];
   }
+
+  return data.map((poll) => ({
+    id: poll.id,
+    question: poll.question,
+    category: poll.category,
+    creator: poll.creator_username,
+    options: poll.poll_options.map((option) => ({
+      text: option.text,
+      votes: option.votes
+    }))
+  }));
 }
 
 function savePolls(polls) {
@@ -33,7 +58,7 @@ function saveVotes(votes) {
   fs.writeFileSync(votesFile, JSON.stringify(votes, null, 2), 'utf8');
 }
 
-function getAllPolls() {
+async function getAllPolls() {
   return loadPolls();
 }
 

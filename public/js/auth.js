@@ -28,7 +28,7 @@ function AuthForm() {
         throw new Error(data.message || 'Submit failed');
       }
 
-      if (pageType === 'login') {
+      if (pageType === 'login' || pageType === 'signup') {
         window.location.href = `/dashboard`;
       } else {
         setResult(data);
