@@ -1,11 +1,23 @@
-const fs = require('fs');
-const path = require('path');
 const supabase = require('./supabaseClient');
 
-const pollsFile = path.join(__dirname, '..', 'data', 'polls.json');
-const votesFile = path.join(__dirname, '..', 'data', 'votes.json');
+function formatPoll(poll) {
+  const options = [...(poll.poll_options || [])]
+    .sort((a, b) => a.option_index - b.option_index)
+    .map((option) => ({
+      text: option.text,
+      votes: option.votes
+    }));
 
-async function loadPolls() {
+  return {
+    id: poll.id,
+    question: poll.question,
+    category: poll.category,
+    creator: poll.creator_username,
+    options
+  };
+}
+
+async function getAllPolls() {
   const { data, error } = await supabase
     .from('polls')
     .select(`
@@ -13,129 +25,219 @@ async function loadPolls() {
       question,
       category,
       creator_username,
+      created_at,
       poll_options (
+        id,
         text,
         votes,
         option_index
       )
     `)
-    .order('created_at', { ascending: true })
-    .order('option_index', { foreignTable: 'poll_options', ascending: true });
+    .order('created_at', { ascending: true });
 
   if (error) {
-    console.error('Error loading polls:', error.message);
-    return [];
+    throw error;
   }
 
-  return data.map((poll) => ({
-    id: poll.id,
-    question: poll.question,
-    category: poll.category,
-    creator: poll.creator_username,
-    options: poll.poll_options.map((option) => ({
-      text: option.text,
-      votes: option.votes
-    }))
+  return data.map(formatPoll);
+}
+
+async function getUserVotes(username) {
+  const { data, error } = await supabase
+    .from('votes')
+    .select('poll_id, option_index')
+    .eq('username', username);
+
+  if (error) {
+    throw error;
+  }
+
+  return data.map((vote) => ({
+    pollId: vote.poll_id,
+    optionIndex: vote.option_index
   }));
 }
 
-function savePolls(polls) {
-  fs.writeFileSync(pollsFile, JSON.stringify(polls, null, 2), 'utf8');
-}
+async function createPoll({ question, options, creator, category }) {
+  const { data: poll, error: pollError } = await supabase
+    .from('polls')
+    .insert({
+      question,
+      category: category || 'Opinion',
+      creator_username: creator
+    })
+    .select('id, question, category, creator_username')
+    .single();
 
-function loadVotes() {
-  try {
-    const data = fs.readFileSync(votesFile, 'utf8');
-    return JSON.parse(data || '[]');
-  } catch (error) {
-    console.error('Error loading votes:', error);
-    return [];
-  }
-}
-
-function saveVotes(votes) {
-  fs.mkdirSync(path.dirname(votesFile), { recursive: true });
-  fs.writeFileSync(votesFile, JSON.stringify(votes, null, 2), 'utf8');
-}
-
-async function getAllPolls() {
-  return loadPolls();
-}
-
-function getUserVotes(username) {
-  return loadVotes().filter((vote) => vote.username === username);
-}
-
-function createPoll({ question, options, creator, category }) {
-  const polls = loadPolls();
-  const newPoll = {
-    id: Date.now().toString(),
-    question,
-    options: options.map((option) => ({ text: option, votes: 0 })),
-    creator,
-    category: category || 'Opinion'
-  };
-
-  polls.push(newPoll);
-  savePolls(polls);
-  return newPoll;
-}
-
-function deletePoll(pollId, username) {
-  const polls = loadPolls();
-  const poll = polls.find(p => p.id === pollId);
-
-  if(!poll){
-    return { status: 404, error: 'Poll not found' };
+  if (pollError) {
+    throw pollError;
   }
 
-  if(poll.creator !== username) {
-    return {status: 403, error: 'Only the creator can delete this poll.'};
+  const optionRows = options.map((option, index) => ({
+    poll_id: poll.id,
+    text: option,
+    option_index: index,
+    votes: 0
+  }));
+
+  const { data: createdOptions, error: optionsError } = await supabase
+    .from('poll_options')
+    .insert(optionRows)
+    .select('id, text, votes, option_index')
+    .order('option_index', { ascending: true });
+
+  if (optionsError) {
+    throw optionsError;
+  }
+
+  return formatPoll({
+    ...poll,
+    poll_options: createdOptions
+  });
 }
 
-  const updatedPolls = polls.filter(p => p.id !== pollId);
-  savePolls(updatedPolls);
+async function deletePoll(pollId, username) {
+  const { data: poll, error: pollError } = await supabase
+    .from('polls')
+    .select('id, creator_username')
+    .eq('id', pollId)
+    .maybeSingle();
 
-  const votes = loadVotes();
-  const updatedVotes = votes.filter(vote => vote.pollId !== pollId);
-  saveVotes(updatedVotes);
-
-  return {};
-}
-
-function voteOnPoll({ pollId, optionIndex, username }) {
-  const votes = loadVotes();
-  const existingVote = votes.find((vote) => vote.username === username && vote.pollId === pollId);
-
-  const polls = loadPolls();
-  const poll = polls.find((savedPoll) => savedPoll.id === pollId);
+  if (pollError) {
+    throw pollError;
+  }
 
   if (!poll) {
     return { status: 404, error: 'Poll not found' };
   }
 
-  if (optionIndex < 0 || optionIndex >= poll.options.length) {
+  if (poll.creator_username !== username) {
+    return { status: 403, error: 'Only the creator can delete this poll.' };
+  }
+
+  const { error: deleteError } = await supabase
+    .from('polls')
+    .delete()
+    .eq('id', pollId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  return {};
+}
+
+async function getPollOption(pollId, optionIndex) {
+  const { data: option, error } = await supabase
+    .from('poll_options')
+    .select('id, poll_id, option_index, votes')
+    .eq('poll_id', pollId)
+    .eq('option_index', optionIndex)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return option;
+}
+
+async function getPollById(pollId) {
+  const { data: poll, error } = await supabase
+    .from('polls')
+    .select(`
+      id,
+      question,
+      category,
+      creator_username,
+      poll_options (
+        id,
+        text,
+        votes,
+        option_index
+      )
+    `)
+    .eq('id', pollId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return formatPoll(poll);
+}
+
+async function voteOnPoll({ pollId, optionIndex, username }) {
+  const option = await getPollOption(pollId, optionIndex);
+
+  if (!option) {
     return { status: 400, error: 'Invalid option' };
   }
 
+  const { data: existingVote, error: existingVoteError } = await supabase
+    .from('votes')
+    .select('id, option_id, option_index')
+    .eq('username', username)
+    .eq('poll_id', pollId)
+    .maybeSingle();
+
+  if (existingVoteError) {
+    throw existingVoteError;
+  }
+
   if (existingVote) {
-    if (existingVote.optionIndex !== optionIndex) {
+    if (existingVote.option_index !== optionIndex) {
       return { status: 400, error: 'You already voted on this poll' };
     }
 
-    poll.options[optionIndex].votes--;
-    const voteIndex = votes.findIndex((vote) => vote.username === username && vote.pollId === pollId);
-    votes.splice(voteIndex, 1);
-    saveVotes(votes);
-    savePolls(polls);
-    return { poll };
+    const { error: deleteVoteError } = await supabase
+      .from('votes')
+      .delete()
+      .eq('id', existingVote.id);
+
+    if (deleteVoteError) {
+      throw deleteVoteError;
+    }
+
+    const { error: decrementError } = await supabase
+      .from('poll_options')
+      .update({ votes: Math.max(option.votes - 1, 0) })
+      .eq('id', option.id);
+
+    if (decrementError) {
+      throw decrementError;
+    }
+
+    return { poll: await getPollById(pollId) };
   }
 
-  poll.options[optionIndex].votes++;
-  votes.push({ username, pollId, optionIndex });
-  saveVotes(votes);
-  savePolls(polls);
-  return { poll };
+  const { error: insertVoteError } = await supabase
+    .from('votes')
+    .insert({
+      poll_id: pollId,
+      option_id: option.id,
+      username,
+      option_index: optionIndex
+    });
+
+  if (insertVoteError) {
+    if (insertVoteError.code === '23505') {
+      return { status: 400, error: 'You already voted on this poll' };
+    }
+
+    throw insertVoteError;
+  }
+
+  const { error: incrementError } = await supabase
+    .from('poll_options')
+    .update({ votes: option.votes + 1 })
+    .eq('id', option.id);
+
+  if (incrementError) {
+    throw incrementError;
+  }
+
+  return { poll: await getPollById(pollId) };
 }
 
 module.exports = {

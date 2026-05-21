@@ -64,6 +64,17 @@ body {
     margin-top: 0;
 }
 
+.delete-poll-button {
+    margin-bottom: 10px;
+    border: 1px solid #b45309;
+    background-color: #fff7ed;
+    color: #7c2d12;
+}
+
+.delete-poll-button:hover {
+    background-color: #ffedd5;
+}
+
 .poll-options button {
     margin: 5px 5px 5px 0;
     padding: 8px 12px;

@@ -189,7 +189,7 @@ function Dashboard() {
           <div className="poll-detail">
             <h2>{selectedPoll.question}</h2>
             {selectedPoll.creator === currentUser && (
-              <button onClick={() => deletePoll(selectedPoll.id)} style={{ color: 'red', marginBottom: '10px' }}>Delete Poll</button>
+              <button className="delete-poll-button" onClick={() => deletePoll(selectedPoll.id)}>Delete Poll</button>
             )}
 
             <p>Category: <strong>{selectedPoll.category}</strong> | Created by: {selectedPoll.creator}</p>

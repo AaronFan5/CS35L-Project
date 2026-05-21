@@ -1,5 +1,11 @@
 const jwt = require('jsonwebtoken');
-const SECRET_KEY = 'super-secret-development-key';
+require('dotenv').config();
+
+const SECRET_KEY = process.env.JWT_SECRET;
+
+if (!SECRET_KEY) {
+  throw new Error('Missing JWT_SECRET in .env');
+}
 
 function requireAuth(req, res, next) {
   const token = req.cookies.token;
