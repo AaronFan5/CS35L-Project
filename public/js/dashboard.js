@@ -9,11 +9,17 @@ function Dashboard() {
   const [selectedPollId, setSelectedPollId] = useState(null);
   const [category, setCategory] = useState('Opinion');
   const [activeFilter, setActiveFilter] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewMode, setViewMode] = useState('All');
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
-  const filteredPolls = activeFilter === 'All' ? polls : polls.filter(poll => poll.category === activeFilter);
-
-  useEffect(() => {
+const filteredPolls = polls.filter(poll => {
+    if (viewMode === 'Mine') return poll.creator === currentUser;
+    if (viewMode === 'Voted') return userVotes.hasOwnProperty(poll.id);
+    return true;
+  })
+  .filter(poll => activeFilter === 'All' ? true : poll.category === activeFilter)
+  .filter(poll => poll.question.toLowerCase().includes(searchTerm.toLowerCase()));  useEffect(() => {
     fetch('/auth/me')
       .then((response) => {
         if (!response.ok) {
@@ -142,6 +148,18 @@ function Dashboard() {
       <h1>Poll Dashboard - Welcome {currentUser}</h1>
       <button onClick={handleLogout} style={{ backgroundColor: '#dc3545' }}>Log Out</button>
       
+      <div className="view-mode-buttons" style={{ margin: '15px 0', display: 'flex', alignItems: 'center'}}>
+        {['All', 'Mine', 'Voted'].map(mode => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            style={{ fontWeight: viewMode === mode ? 'bold' : 'normal', marginRight: '10px' }}
+          >
+            {mode.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      
       <div className="create-poll">
         <h2>Create a New Poll</h2>
         <input placeholder="Question" value={question} onChange={(event) => setQuestion(event.target.value)} /><br />
@@ -156,7 +174,16 @@ function Dashboard() {
 
         <button onClick={createPoll}>Create Poll</button>
       </div>
-
+      
+      <div className="search-bar" style={{ margin: '20px 0 10px 0'}}>
+        <input
+          type="text"
+          placeholder="Search Polls by Question..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: '100%', padding: '10px', fontSize: '16px', boxSizing: 'border-box' }}
+        />
+      </div>
       <div className="filter-buttons" style={{ margin: '20px 0' }}>
         {['All', 'Food', 'Location', 'Opinion'].map(tab => (
           <button
