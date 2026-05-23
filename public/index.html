@@ -1,15 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CS35L Polls</title>
-    <link rel="stylesheet" href="/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Polls</title>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-    <h1>Welcome to (figure out app name later)</h1>
-    <p>Please log-in or sign up</p>
-    <a href="/auth/login"><button>Login</button></a>
-    <a href="/auth/signup"><button>Sign up</button></a>
+  <nav>
+    <a href="/" class="nav-brand">Polls</a>
+    <div class="nav-actions">
+      <a href="/auth/login" class="btn btn-ghost">Log in</a>
+      <a href="/auth/signup" class="btn">Sign up</a>
+    </div>
+  </nav>
+  <div class="landing">
+    <h1>Polls that bring UCLA students together</h1>
+    <p>Create polls, gather votes, and see results in real time.</p>
+    <div class="landing-buttons">
+      <a href="/auth/signup" class="btn">Get started</a>
+      <a href="/auth/login" class="btn btn-ghost">Log in</a>
+    </div>
+  </div>
 </body>
 </html>
