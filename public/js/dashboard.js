@@ -62,7 +62,9 @@ const filteredPolls = polls.filter(poll => {
   }, [activeFilter, polls]);
 
   const createPoll = async () => {
-    const optionsArray = options.split(',').map((option) => option.trim());
+    const optionsArray = options.split(',').map((option) => option.trim()).filter(Boolean);
+    if (!question.trim()) { alert('Please enter a question.'); return; }
+    if (optionsArray.length < 2) { alert('Please enter at least 2 options.'); return; }
     const response = await fetch('/polls/create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
