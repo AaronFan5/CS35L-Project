@@ -33,8 +33,8 @@ router.post('/create', async (req, res) => {
   }
 });
 
-router.post('/delete', async (req, res) => {
-  const { pollId } = req.body;
+router.delete('/:id', async (req, res) => {
+  const pollId = req.params.id;
   try {
     const result = await pollService.deletePoll(pollId, req.user.username); // securely set user
     if(result.error) return res.status(result.status).json({ message: result.error });
