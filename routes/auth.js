@@ -47,7 +47,10 @@ router.post('/login', async (req, res) => {
   }
   
   if (!user) {
-    return res.status(400).json({ message: 'Invalid username or password' });
+    return res.status(400).json({ message: 'No account was found with that username' });
+  }
+  if (user.password !== password) {
+    return res.status(400).json({ message: 'Incorrect password' });
   }
 
   const token = jwt.sign({ username: user.username }, SECRET_KEY, { expiresIn: '1h' });
@@ -66,6 +69,9 @@ router.get('/signup', (req, res) => {
 
 router.post('/signup', async (req, res) => {
   const { name, email, username, password } = req.body;
+  if (!password || password.length < 8) {
+    return res.status(400).json({ message: 'Incorrect password. Password must be at least 8 characters long' });
+  }
   try {
     if (await findUser(username, email)) {
       return res.status(400).json({ message: 'Username or email already exists' });
