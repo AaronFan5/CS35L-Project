@@ -78,10 +78,8 @@ const filteredPolls = polls.filter(poll => {
   };
 
   const deletePoll = async (pollId) => {
-    const response = await fetch('/polls/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pollId })
+    const response = await fetch(`/polls/${pollId}`, {
+    method: 'DELETE'
     });
     if(response.ok){
       const updatedPolls = polls.filter(poll => poll.id !== pollId);
