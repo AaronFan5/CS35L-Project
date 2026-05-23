@@ -43,14 +43,18 @@ function AuthForm() {
       <h1>{pageTitle}</h1>
       <p>{pageHeadline}</p>
       <form onSubmit={handleSubmit}>
+      {pageType === 'signup' && (
         <div>
           <label htmlFor="name">Name</label>
           <input id="name" value={name} onChange={(event) => setName(event.target.value)} type="text" placeholder="Name" required />
         </div>
+      )}
+      {pageType === 'signup' && (
         <div>
           <label htmlFor="email">Email</label>
           <input id="email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" placeholder="Email" required />
         </div>
+      )}
         <div>
           <label htmlFor="username">Username</label>
           <input id="username" value={username} onChange={(event) => setUsername(event.target.value)} type="text" placeholder="Username" required />
