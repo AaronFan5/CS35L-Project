@@ -3,13 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Login</title>
+  <title>Log in</title>
   <link rel="stylesheet" href="/styles.css" />
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body data-page-type="login">
+  <nav>
+    <a href="/" class="nav-brand">Polls</a>
+    <div class="nav-actions">
+      <a href="/auth/signup" class="btn btn-ghost">Sign up</a>
+    </div>
+  </nav>
   <div id="root"></div>
   <script type="text/babel" src="/js/auth.js"></script>
 </body>
