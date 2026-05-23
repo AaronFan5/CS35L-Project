@@ -13,6 +13,7 @@ create table if not exists polls (
   category text not null default 'Opinion',
   creator_username text not null references users(username) on delete cascade,
   created_at timestamptz not null default now()
+  is_open boolean not null default true
 );
 
 create table if not exists poll_options (

@@ -13,6 +13,7 @@ function formatPoll(poll) {
     question: poll.question,
     category: poll.category,
     creator: poll.creator_username,
+    isOpen: poll.is_open,
     options
   };
 }
@@ -26,6 +27,7 @@ async function getAllPolls() {
       category,
       creator_username,
       created_at,
+      is_open,
       poll_options (
         id,
         text,
@@ -150,6 +152,7 @@ async function getPollById(pollId) {
       question,
       category,
       creator_username,
+      is_open,
       poll_options (
         id,
         text,
@@ -169,6 +172,11 @@ async function getPollById(pollId) {
 
 async function voteOnPoll({ pollId, optionIndex, username }) {
   const option = await getPollOption(pollId, optionIndex);
+
+  const { data: pollData } = await supabase.from('polls').select('is_open').eq('id', pollId).single();
+  if (!pollData.is_open) {
+    return { status: 403, error: 'This poll is currently closed.' };
+  }
 
   if (!option) {
     return { status: 400, error: 'Invalid option' };
@@ -240,10 +248,31 @@ async function voteOnPoll({ pollId, optionIndex, username }) {
   return { poll: await getPollById(pollId) };
 }
 
+async function togglePollStatus(pollId, username) {
+  const { data: poll, error: pollError } = await supabase
+    .from('polls')
+    .select('id, creator_username, is_open')
+    .eq('id', pollId)
+    .maybeSingle();
+
+  if (pollError) throw pollError;
+  if (!poll) return { status: 404, error: 'Poll not found' };
+  if (poll.creator_username !== username) return { status: 403, error: 'Only the creator can close this poll.' };
+
+  const { error: updateError } = await supabase
+    .from('polls')
+    .update({ is_open: !poll.is_open })
+    .eq('id', pollId);
+
+  if (updateError) throw updateError;
+  return { poll: await getPollById(pollId) };
+}
+
 module.exports = {
   createPoll,
   getAllPolls,
   getUserVotes,
   voteOnPoll,
-  deletePoll
+  deletePoll,
+  togglePollStatus
 };

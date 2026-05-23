@@ -87,6 +87,20 @@ function Dashboard() {
     }
   };
 
+  const togglePollStatus = async (pollId) => {
+    const response = await fetch('/polls/toggle-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pollId })
+    });
+    const data = await response.json();
+    if (response.ok) {
+      setPolls(polls.map((poll) => (poll.id === pollId ? data : poll)));
+    } else {
+      alert(data.message);
+    }
+  };
+
   const handleVote = async (pollId, optionIndex) => {
     const response = await fetch('/polls/vote', {
       method: 'POST',
@@ -213,11 +227,15 @@ function Dashboard() {
           {selectedPoll && (
             <div className="poll-detail">
               <h2>{selectedPoll.question}</h2>
-              <p className="poll-meta">
-                Category: <strong>{selectedPoll.category}</strong> &middot; by {selectedPoll.creator}
-              </p>
+              {!selectedPoll.isOpen && <p style={{ color: '#7c2d12', fontWeight: 'bold' }}>🔒 This poll is closed to new votes.</p>}
+
               {selectedPoll.creator === currentUser && (
-                <button className="delete-poll-button" onClick={() => deletePoll(selectedPoll.id)}>Delete poll</button>
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                  <button onClick={() => deletePoll(selectedPoll.id)} className="delete-poll-button">Delete Poll</button>
+                  <button onClick={() => togglePollStatus(selectedPoll.id)} className="btn-ghost">
+                    {selectedPoll.isOpen ? 'Close Poll' : 'Reopen Poll'}
+                  </button>
+                </div>
               )}
               <div className="poll-options">
                 {selectedPoll.options.map((option, index) => (
@@ -225,8 +243,10 @@ function Dashboard() {
                     key={index}
                     onClick={() => handleVote(selectedPoll.id, index)}
                     className={userVotes[selectedPoll.id] === index ? 'voted-option' : ''}
+                    disabled={!selectedPoll.isOpen}
+                    style={{ opacity: !selectedPoll.isOpen ? 0.6 : 1, cursor: !selectedPoll.isOpen ? 'not-allowed' : 'pointer' }}
                   >
-                    {option.text}
+                    {option.text} ({option.votes})
                   </button>
                 ))}
               </div>
