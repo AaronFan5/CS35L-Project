@@ -4,7 +4,7 @@ function Dashboard() {
   const [currentUser, setCurrentUser] = useState('');
   const [polls, setPolls] = useState([]);
   const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState('');
+  const [options, setOptions] = useState(['', '']);
   const [userVotes, setUserVotes] = useState({});
   const [selectedPollId, setSelectedPollId] = useState(null);
   const [category, setCategory] = useState('Opinion');
@@ -57,8 +57,21 @@ function Dashboard() {
     }
   }, [activeFilter, polls]);
 
+  const updateOption = (index, value) => {
+    setOptions(options.map((option, optionIndex) => optionIndex === index ? value : option));
+  };
+
+  const addOption = () => {
+    setOptions([...options, '']);
+  };
+
+  const removeOption = (index) => {
+    if (options.length <= 2) return;
+    setOptions(options.filter((_, optionIndex) => optionIndex !== index));
+  };
+
   const createPoll = async () => {
-    const optionsArray = options.split(',').map((o) => o.trim()).filter(Boolean);
+    const optionsArray = options.map((o) => o.trim()).filter(Boolean);
     if (!question.trim()) { alert('Please enter a question.'); return; }
     if (optionsArray.length < 2) { alert('Please enter at least 2 options.'); return; }
 
@@ -68,10 +81,16 @@ function Dashboard() {
       body: JSON.stringify({ question, options: optionsArray, category })
     });
     const newPoll = await response.json();
+
+    if (!response.ok) {
+      alert(newPoll.message);
+      return;
+    }
+
     setPolls([...polls, newPoll]);
     setSelectedPollId(newPoll.id);
     setQuestion('');
-    setOptions('');
+    setOptions(['', '']);
   };
 
   const deletePoll = async (pollId) => {
@@ -147,7 +166,28 @@ function Dashboard() {
           </div>
           <div className="form-group">
             <label>Options</label>
-            <input placeholder="Comma-separated options (e.g. Pizza, Sushi, Tacos)" value={options} onChange={(e) => setOptions(e.target.value)} />
+            <div className="option-input-list">
+              {options.map((option, index) => (
+                <div className="option-input-row" key={index}>
+                  <input
+                    placeholder={`Option ${index + 1}`}
+                    value={option}
+                    onChange={(e) => updateOption(index, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm option-remove-button"
+                    onClick={() => removeOption(index)}
+                    disabled={options.length <= 2}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="btn-ghost btn-sm add-option-button" onClick={addOption}>
+              Add option
+            </button>
           </div>
           <div className="create-poll-footer">
             <select value={category} onChange={(e) => setCategory(e.target.value)}>
