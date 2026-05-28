@@ -1,5 +1,19 @@
 const supabase = require('./supabaseClient');
 
+const POLL_WITH_OPTIONS_SELECT = `
+  id,
+  question,
+  category,
+  creator_username,
+  is_open,
+  poll_options (
+    id,
+    text,
+    votes,
+    option_index
+  )
+`;
+
 function formatPoll(poll) {
   const options = [...(poll.poll_options || [])]
     .sort((a, b) => a.option_index - b.option_index)
@@ -21,20 +35,7 @@ function formatPoll(poll) {
 async function getAllPolls() {
   const { data, error } = await supabase
     .from('polls')
-    .select(`
-      id,
-      question,
-      category,
-      creator_username,
-      created_at,
-      is_open,
-      poll_options (
-        id,
-        text,
-        votes,
-        option_index
-      )
-    `)
+    .select(`created_at, ${POLL_WITH_OPTIONS_SELECT}`)
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -147,19 +148,7 @@ async function getPollOption(pollId, optionIndex) {
 async function getPollById(pollId) {
   const { data: poll, error } = await supabase
     .from('polls')
-    .select(`
-      id,
-      question,
-      category,
-      creator_username,
-      is_open,
-      poll_options (
-        id,
-        text,
-        votes,
-        option_index
-      )
-    `)
+    .select(POLL_WITH_OPTIONS_SELECT)
     .eq('id', pollId)
     .single();
 

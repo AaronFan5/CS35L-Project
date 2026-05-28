@@ -1,10 +1,96 @@
 const { useEffect, useState } = React;
 
+async function fetchCurrentUser() {
+  const response = await fetch('/auth/me');
+
+  if (!response.ok) {
+    throw new Error('Not authenticated');
+  }
+
+  return response.json();
+}
+
+async function fetchUserVotes() {
+  const response = await fetch('/polls/user-votes');
+  return response.json();
+}
+
+async function fetchPolls() {
+  const response = await fetch('/polls/all');
+  return response.json();
+}
+
+async function createPollRequest(pollData) {
+  const response = await fetch('/polls/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pollData)
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message);
+  }
+
+  return data;
+}
+
+async function deletePollRequest(pollId) {
+  const response = await fetch(`/polls/${pollId}`, { method: 'DELETE' });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message);
+  }
+}
+
+async function voteOnPollRequest(pollId, optionIndex) {
+  const response = await fetch('/polls/vote', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pollId, optionIndex })
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message);
+  }
+
+  return data;
+}
+
+async function logoutRequest() {
+  await fetch('/auth/logout', { method: 'POST' });
+}
+
+function votesByPollId(votes) {
+  const votesMap = {};
+
+  if (Array.isArray(votes)) {
+    votes.forEach((vote) => {
+      votesMap[vote.pollId] = vote.optionIndex;
+    });
+  }
+
+  return votesMap;
+}
+
+function filterPolls(polls, { viewMode, currentUser, userVotes, activeFilter, searchTerm }) {
+  return polls
+    .filter(poll => {
+      if (viewMode === 'Mine') return poll.creator === currentUser;
+      if (viewMode === 'Voted') return userVotes.hasOwnProperty(poll.id);
+      return true;
+    })
+    .filter(poll => activeFilter === 'All' ? true : poll.category === activeFilter)
+    .filter(poll => poll.question.toLowerCase().includes(searchTerm.toLowerCase()));
+}
+
 function Dashboard() {
   const [currentUser, setCurrentUser] = useState('');
   const [polls, setPolls] = useState([]);
   const [question, setQuestion] = useState('');
-  const [options, setOptions] = useState('');
+  const [options, setOptions] = useState(['', '']);
   const [userVotes, setUserVotes] = useState({});
   const [selectedPollId, setSelectedPollId] = useState(null);
   const [category, setCategory] = useState('Opinion');
@@ -14,37 +100,29 @@ function Dashboard() {
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
 
-  const filteredPolls = polls
-    .filter(poll => {
-      if (viewMode === 'Mine') return poll.creator === currentUser;
-      if (viewMode === 'Voted') return userVotes.hasOwnProperty(poll.id);
-      return true;
-    })
-    .filter(poll => activeFilter === 'All' ? true : poll.category === activeFilter)
-    .filter(poll => poll.question.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredPolls = filterPolls(polls, {
+    viewMode,
+    currentUser,
+    userVotes,
+    activeFilter,
+    searchTerm
+  });
 
   useEffect(() => {
-    fetch('/auth/me')
-      .then((res) => {
-        if (!res.ok) { window.location.href = '/auth/login'; throw new Error('Not authenticated'); }
-        return res.json();
-      })
+    fetchCurrentUser()
       .then((data) => {
         setCurrentUser(data.username);
-        return fetch('/polls/user-votes');
+        return fetchUserVotes();
       })
-      .then((res) => res.json())
-      .then((votes) => {
-        const votesMap = {};
-        if (Array.isArray(votes)) {
-          votes.forEach((vote) => { votesMap[vote.pollId] = vote.optionIndex; });
+      .then((votes) => setUserVotes(votesByPollId(votes)))
+      .catch((err) => {
+        console.error('Auth error:', err);
+        if (err.message === 'Not authenticated') {
+          window.location.href = '/auth/login';
         }
-        setUserVotes(votesMap);
-      })
-      .catch((err) => console.error('Auth error:', err));
+      });
 
-    fetch('/polls/all')
-      .then((res) => res.json())
+    fetchPolls()
       .then((data) => {
         setPolls(data);
         if (data.length > 0) setSelectedPollId(data[0].id);
@@ -57,26 +135,39 @@ function Dashboard() {
     }
   }, [activeFilter, polls]);
 
+  const updateOption = (index, value) => {
+    setOptions(options.map((option, optionIndex) => optionIndex === index ? value : option));
+  };
+
+  const addOption = () => {
+    setOptions([...options, '']);
+  };
+
+  const removeOption = (index) => {
+    if (options.length <= 2) return;
+    setOptions(options.filter((_, optionIndex) => optionIndex !== index));
+  };
+
   const createPoll = async () => {
-    const optionsArray = options.split(',').map((o) => o.trim()).filter(Boolean);
+    const optionsArray = options.map((o) => o.trim()).filter(Boolean);
     if (!question.trim()) { alert('Please enter a question.'); return; }
     if (optionsArray.length < 2) { alert('Please enter at least 2 options.'); return; }
 
-    const response = await fetch('/polls/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, options: optionsArray, category })
-    });
-    const newPoll = await response.json();
-    setPolls([...polls, newPoll]);
-    setSelectedPollId(newPoll.id);
-    setQuestion('');
-    setOptions('');
+    try {
+      const newPoll = await createPollRequest({ question, options: optionsArray, category });
+      setPolls([...polls, newPoll]);
+      setSelectedPollId(newPoll.id);
+      setQuestion('');
+      setOptions(['', '']);
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
   };
 
   const deletePoll = async (pollId) => {
-    const response = await fetch(`/polls/${pollId}`, { method: 'DELETE' });
-    if (response.ok) {
+    try {
+      await deletePollRequest(pollId);
       const updatedPolls = polls.filter(poll => poll.id !== pollId);
       setPolls(updatedPolls);
       if (selectedPollId === pollId && updatedPolls.length > 0) {
@@ -84,6 +175,8 @@ function Dashboard() {
       } else if (updatedPolls.length === 0) {
         setSelectedPollId(null);
       }
+    } catch (error) {
+      alert(error.message);
     }
   };
 
@@ -102,15 +195,16 @@ function Dashboard() {
   };
 
   const handleVote = async (pollId, optionIndex) => {
-    const response = await fetch('/polls/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pollId, optionIndex })
-    });
-    const data = await response.json();
-    if (!response.ok) { alert(data.message); return; }
+    let updatedPoll;
 
-    setPolls(polls.map((poll) => poll.id === pollId ? data : poll));
+    try {
+      updatedPoll = await voteOnPollRequest(pollId, optionIndex);
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
+
+    setPolls(polls.map((poll) => poll.id === pollId ? updatedPoll : poll));
     const newUserVotes = { ...userVotes };
     if (userVotes[pollId] === optionIndex) {
       delete newUserVotes[pollId];
@@ -121,7 +215,7 @@ function Dashboard() {
   };
 
   const handleLogout = async () => {
-    await fetch('/auth/logout', { method: 'POST' });
+    await logoutRequest();
     window.location.href = '/';
   };
 
@@ -161,7 +255,28 @@ function Dashboard() {
           </div>
           <div className="form-group">
             <label>Options</label>
-            <input placeholder="Comma-separated options (e.g. Pizza, Sushi, Tacos)" value={options} onChange={(e) => setOptions(e.target.value)} />
+            <div className="option-input-list">
+              {options.map((option, index) => (
+                <div className="option-input-row" key={index}>
+                  <input
+                    placeholder={`Option ${index + 1}`}
+                    value={option}
+                    onChange={(e) => updateOption(index, e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm option-remove-button"
+                    onClick={() => removeOption(index)}
+                    disabled={options.length <= 2}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button type="button" className="btn-ghost btn-sm add-option-button" onClick={addOption}>
+              Add option
+            </button>
           </div>
           <div className="create-poll-footer">
             <select value={category} onChange={(e) => setCategory(e.target.value)}>
