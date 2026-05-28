@@ -4,6 +4,7 @@ const path = require('path');
 const authRouter = require('./routes/auth');
 const pollsRouter = require('./routes/polls');
 const dashboardRouter = require('./routes/dashboard');
+const usersRouter = require('./routes/users');
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -13,6 +14,7 @@ app.use(cookieParser());
 app.use(express.static('public'));
 app.use('/auth', authRouter);
 app.use('/polls', pollsRouter);
+app.use('/users', usersRouter);
 app.use('/dashboard', dashboardRouter);
 
 app.get('/', (req, res) => {

@@ -7,6 +7,15 @@ create table if not exists users (
   created_at timestamptz not null default now()
 );
 
+create table if not exists follows (
+  id uuid primary key default gen_random_uuid(),
+  follower_username text not null references users(username) on delete cascade,
+  followed_username text not null references users(username) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (follower_username, followed_username),
+  check (follower_username <> followed_username)
+);
+
 create table if not exists polls (
   id uuid primary key default gen_random_uuid(),
   question text not null,

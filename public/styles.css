@@ -358,6 +358,24 @@ label {
 .poll-meta { font-size: 0.875rem; color: #5f5f5d; margin-bottom: 20px; }
 .poll-meta strong { color: #1c1c1c; }
 
+.follow-button {
+  font-size: 0.875rem;
+  padding: 6px 12px;
+  margin-bottom: 16px;
+}
+
+.follow-button.following {
+  background: transparent;
+  color: #1c1c1c;
+  border: 1px solid rgba(28,28,28,0.4);
+  box-shadow: none;
+}
+
+.follow-button.following:hover {
+  background: rgba(28,28,28,0.04);
+  opacity: 1;
+}
+
 
 .poll-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
 

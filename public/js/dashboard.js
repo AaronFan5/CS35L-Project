@@ -20,6 +20,11 @@ async function fetchPolls() {
   return response.json();
 }
 
+async function fetchFollowing() {
+  const response = await fetch('/users/me/following');
+  return response.json();
+}
+
 async function createPollRequest(pollData) {
   const response = await fetch('/polls/create', {
     method: 'POST',
@@ -59,6 +64,32 @@ async function voteOnPollRequest(pollId, optionIndex) {
   return data;
 }
 
+async function followUserRequest(username) {
+  const response = await fetch(`/users/${encodeURIComponent(username)}/follow`, {
+    method: 'POST'
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message);
+  }
+
+  return data;
+}
+
+async function unfollowUserRequest(username) {
+  const response = await fetch(`/users/${encodeURIComponent(username)}/follow`, {
+    method: 'DELETE'
+  });
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message);
+  }
+
+  return data;
+}
+
 async function logoutRequest() {
   await fetch('/auth/logout', { method: 'POST' });
 }
@@ -75,11 +106,12 @@ function votesByPollId(votes) {
   return votesMap;
 }
 
-function filterPolls(polls, { viewMode, currentUser, userVotes, activeFilter, searchTerm }) {
+function filterPolls(polls, { viewMode, currentUser, userVotes, followingUsers, activeFilter, searchTerm }) {
   return polls
     .filter(poll => {
       if (viewMode === 'Mine') return poll.creator === currentUser;
       if (viewMode === 'Voted') return userVotes.hasOwnProperty(poll.id);
+      if (viewMode === 'Following') return followingUsers.includes(poll.creator);
       return true;
     })
     .filter(poll => activeFilter === 'All' ? true : poll.category === activeFilter)
@@ -92,6 +124,7 @@ function Dashboard() {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [userVotes, setUserVotes] = useState({});
+  const [followingUsers, setFollowingUsers] = useState([]);
   const [selectedPollId, setSelectedPollId] = useState(null);
   const [category, setCategory] = useState('Opinion');
   const [activeFilter, setActiveFilter] = useState('All');
@@ -104,6 +137,7 @@ function Dashboard() {
     viewMode,
     currentUser,
     userVotes,
+    followingUsers,
     activeFilter,
     searchTerm
   });
@@ -112,9 +146,12 @@ function Dashboard() {
     fetchCurrentUser()
       .then((data) => {
         setCurrentUser(data.username);
-        return fetchUserVotes();
+        return Promise.all([fetchUserVotes(), fetchFollowing()]);
       })
-      .then((votes) => setUserVotes(votesByPollId(votes)))
+      .then(([votes, following]) => {
+        setUserVotes(votesByPollId(votes));
+        setFollowingUsers(Array.isArray(following) ? following : []);
+      })
       .catch((err) => {
         console.error('Auth error:', err);
         if (err.message === 'Not authenticated') {
@@ -133,7 +170,7 @@ function Dashboard() {
     if (filteredPolls.length > 0 && !filteredPolls.find(poll => poll.id === selectedPollId)) {
       setSelectedPollId(filteredPolls[0].id);
     }
-  }, [activeFilter, polls]);
+  }, [activeFilter, followingUsers, polls, viewMode]);
 
   const updateOption = (index, value) => {
     setOptions(options.map((option, optionIndex) => optionIndex === index ? value : option));
@@ -214,6 +251,24 @@ function Dashboard() {
     setUserVotes(newUserVotes);
   };
 
+  const toggleFollow = async (username) => {
+    const isFollowing = followingUsers.includes(username);
+
+    try {
+      if (isFollowing) {
+        await unfollowUserRequest(username);
+        setFollowingUsers((users) => users.filter((user) => user !== username));
+      } else {
+        await followUserRequest(username);
+        setFollowingUsers((users) => (
+          users.includes(username) ? users : [...users, username]
+        ));
+      }
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
   const handleLogout = async () => {
     await logoutRequest();
     window.location.href = '/';
@@ -289,7 +344,7 @@ function Dashboard() {
         </div>
 
         <div className="tab-group">
-          {['All', 'Mine', 'Voted'].map(mode => (
+          {['All', 'Following', 'Mine', 'Voted'].map(mode => (
             <button
               key={mode}
               className={`tab-btn${viewMode === mode ? ' active' : ''}`}
@@ -342,7 +397,22 @@ function Dashboard() {
           {selectedPoll && (
             <div className="poll-detail">
               <h2>{selectedPoll.question}</h2>
+              
+              <p className="poll-meta">
+                Category: <strong>{selectedPoll.category}</strong> &middot; by {selectedPoll.creator}
+              </p>
+
               {!selectedPoll.isOpen && <p style={{ color: '#7c2d12', fontWeight: 'bold' }}>🔒 This poll is closed to new votes.</p>}
+
+              {selectedPoll.creator !== currentUser && (
+                <button
+                  className={`follow-button${followingUsers.includes(selectedPoll.creator) ? ' following' : ''}`}
+                  onClick={() => toggleFollow(selectedPoll.creator)}
+                  style={{ marginBottom: '16px' }}
+                >
+                  {followingUsers.includes(selectedPoll.creator) ? 'Following' : 'Follow'}
+                </button>
+              )}
 
               {selectedPoll.creator === currentUser && (
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
