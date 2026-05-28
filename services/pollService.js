@@ -1,38 +1,22 @@
 const supabase = require('./supabaseClient');
 
-function formatPoll(poll) {
-  const options = [...(poll.poll_options || [])]
-    .sort((a, b) => a.option_index - b.option_index)
-    .map((option) => ({
-      text: option.text,
-      votes: option.votes
-    }));
-
-  return {
-    id: poll.id,
-    question: poll.question,
-    category: poll.category,
-    creator: poll.creator_username,
-    options
-  };
-}
+const POLL_WITH_OPTIONS_SELECT = `
+  id,
+  question,
+  category,
+  creator_username,
+  poll_options (
+    id,
+    text,
+    votes,
+    option_index
+  )
+`;
 
 async function getAllPolls() {
   const { data, error } = await supabase
     .from('polls')
-    .select(`
-      id,
-      question,
-      category,
-      creator_username,
-      created_at,
-      poll_options (
-        id,
-        text,
-        votes,
-        option_index
-      )
-    `)
+    .select(`created_at, ${POLL_WITH_OPTIONS_SELECT}`)
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -127,46 +111,6 @@ async function deletePoll(pollId, username) {
   return {};
 }
 
-async function getPollOption(pollId, optionIndex) {
-  const { data: option, error } = await supabase
-    .from('poll_options')
-    .select('id, poll_id, option_index, votes')
-    .eq('poll_id', pollId)
-    .eq('option_index', optionIndex)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return option;
-}
-
-async function getPollById(pollId) {
-  const { data: poll, error } = await supabase
-    .from('polls')
-    .select(`
-      id,
-      question,
-      category,
-      creator_username,
-      poll_options (
-        id,
-        text,
-        votes,
-        option_index
-      )
-    `)
-    .eq('id', pollId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  return formatPoll(poll);
-}
-
 async function voteOnPoll({ pollId, optionIndex, username }) {
   const option = await getPollOption(pollId, optionIndex);
 
@@ -238,6 +182,52 @@ async function voteOnPoll({ pollId, optionIndex, username }) {
   }
 
   return { poll: await getPollById(pollId) };
+}
+
+function formatPoll(poll) {
+  const options = [...(poll.poll_options || [])]
+    .sort((a, b) => a.option_index - b.option_index)
+    .map((option) => ({
+      text: option.text,
+      votes: option.votes
+    }));
+
+  return {
+    id: poll.id,
+    question: poll.question,
+    category: poll.category,
+    creator: poll.creator_username,
+    options
+  };
+}
+
+async function getPollOption(pollId, optionIndex) {
+  const { data: option, error } = await supabase
+    .from('poll_options')
+    .select('id, poll_id, option_index, votes')
+    .eq('poll_id', pollId)
+    .eq('option_index', optionIndex)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return option;
+}
+
+async function getPollById(pollId) {
+  const { data: poll, error } = await supabase
+    .from('polls')
+    .select(POLL_WITH_OPTIONS_SELECT)
+    .eq('id', pollId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return formatPoll(poll);
 }
 
 module.exports = {
