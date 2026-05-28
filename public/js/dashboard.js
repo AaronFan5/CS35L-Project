@@ -25,6 +25,17 @@ async function fetchFollowing() {
   return response.json();
 }
 
+async function searchUsersRequest(query) {
+  const response = await fetch(`/users/search?q=${encodeURIComponent(query)}`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message);
+  }
+
+  return data;
+}
+
 async function createPollRequest(pollData) {
   const response = await fetch('/polls/create', {
     method: 'POST',
@@ -129,6 +140,9 @@ function Dashboard() {
   const [category, setCategory] = useState('Opinion');
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchMode, setSearchMode] = useState('Polls');
+  const [userResults, setUserResults] = useState([]);
+  const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [viewMode, setViewMode] = useState('All');
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
@@ -171,6 +185,34 @@ function Dashboard() {
       setSelectedPollId(filteredPolls[0].id);
     }
   }, [activeFilter, followingUsers, polls, viewMode]);
+
+  useEffect(() => {
+    const query = searchTerm.trim();
+
+    if (searchMode !== 'Users' || !query) {
+      setUserResults([]);
+      setIsSearchingUsers(false);
+      return;
+    }
+
+    setIsSearchingUsers(true);
+
+    const timeoutId = setTimeout(() => {
+      searchUsersRequest(query)
+        .then((users) => {
+          setUserResults(Array.isArray(users) ? users : []);
+        })
+        .catch((error) => {
+          console.error('User search error:', error);
+          setUserResults([]);
+        })
+        .finally(() => {
+          setIsSearchingUsers(false);
+        });
+    }, 250);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchMode, searchTerm]);
 
   const updateOption = (index, value) => {
     setOptions(options.map((option, optionIndex) => optionIndex === index ? value : option));
@@ -249,6 +291,12 @@ function Dashboard() {
         setFollowingUsers((users) => (
           users.includes(username) ? users : [...users, username]
         ));
+
+        if (searchMode === 'Users') {
+          setSearchMode('Polls');
+          setSearchTerm('');
+          setUserResults([]);
+        }
       }
     } catch (error) {
       alert(error.message);
@@ -342,76 +390,123 @@ function Dashboard() {
         </div>
 
         <div className="search-bar">
+          <div className="search-mode-toggle">
+            {['Polls', 'Users'].map(mode => (
+              <button
+                key={mode}
+                type="button"
+                className={`search-mode-btn${searchMode === mode ? ' active' : ''}`}
+                onClick={() => setSearchMode(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
           <input
             type="text"
-            placeholder="Search polls..."
+            placeholder={searchMode === 'Polls' ? 'Search polls...' : 'Search users...'}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        <div className="filter-group">
-          {['All', 'Food', 'Location', 'Opinion'].map(tab => (
-            <button
-              key={tab}
-              className={`filter-pill${activeFilter === tab ? ' active' : ''}`}
-              onClick={() => setActiveFilter(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="poll-layout">
-          <div className="poll-list">
-            {filteredPolls.map((poll) => (
-              <button
-                key={poll.id}
-                type="button"
-                className={`poll-card${selectedPollId === poll.id ? ' selected-poll' : ''}`}
-                onClick={() => setSelectedPollId(poll.id)}
-              >
-                <h4>{poll.question}</h4>
-                <p>by {poll.creator}</p>
-              </button>
-            ))}
-            {filteredPolls.length === 0 && (
-              <p className="empty-state">No polls found.</p>
-            )}
-          </div>
-
-          {selectedPoll && (
-            <div className="poll-detail">
-              <h2>{selectedPoll.question}</h2>
-              <p className="poll-meta">
-                Category: <strong>{selectedPoll.category}</strong> &middot; by {selectedPoll.creator}
-              </p>
-              {selectedPoll.creator !== currentUser && (
+        {searchMode === 'Polls' && (
+          <React.Fragment>
+            <div className="filter-group">
+              {['All', 'Food', 'Location', 'Opinion'].map(tab => (
                 <button
-                  className={`follow-button${followingUsers.includes(selectedPoll.creator) ? ' following' : ''}`}
-                  onClick={() => toggleFollow(selectedPoll.creator)}
+                  key={tab}
+                  className={`filter-pill${activeFilter === tab ? ' active' : ''}`}
+                  onClick={() => setActiveFilter(tab)}
                 >
-                  {followingUsers.includes(selectedPoll.creator) ? 'Following' : 'Follow'}
+                  {tab}
                 </button>
-              )}
-              {selectedPoll.creator === currentUser && (
-                <button className="delete-poll-button" onClick={() => deletePoll(selectedPoll.id)}>Delete poll</button>
-              )}
-              <div className="poll-options">
-                {selectedPoll.options.map((option, index) => (
+              ))}
+            </div>
+
+            <div className="poll-layout">
+              <div className="poll-list">
+                {filteredPolls.map((poll) => (
                   <button
-                    key={index}
-                    onClick={() => handleVote(selectedPoll.id, index)}
-                    className={userVotes[selectedPoll.id] === index ? 'voted-option' : ''}
+                    key={poll.id}
+                    type="button"
+                    className={`poll-card${selectedPollId === poll.id ? ' selected-poll' : ''}`}
+                    onClick={() => setSelectedPollId(poll.id)}
                   >
-                    {option.text}
+                    <h4>{poll.question}</h4>
+                    <p>by {poll.creator}</p>
                   </button>
                 ))}
+                {filteredPolls.length === 0 && (
+                  <p className="empty-state">No polls found.</p>
+                )}
               </div>
-              {renderPollChart(selectedPoll)}
+
+              {selectedPoll && (
+                <div className="poll-detail">
+                  <h2>{selectedPoll.question}</h2>
+                  <p className="poll-meta">
+                    Category: <strong>{selectedPoll.category}</strong> &middot; by {selectedPoll.creator}
+                  </p>
+                  {selectedPoll.creator !== currentUser && (
+                    <button
+                      className={`follow-button${followingUsers.includes(selectedPoll.creator) ? ' following' : ''}`}
+                      onClick={() => toggleFollow(selectedPoll.creator)}
+                    >
+                      {followingUsers.includes(selectedPoll.creator) ? 'Following' : 'Follow'}
+                    </button>
+                  )}
+                  {selectedPoll.creator === currentUser && (
+                    <button className="delete-poll-button" onClick={() => deletePoll(selectedPoll.id)}>Delete poll</button>
+                  )}
+                  <div className="poll-options">
+                    {selectedPoll.options.map((option, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleVote(selectedPoll.id, index)}
+                        className={userVotes[selectedPoll.id] === index ? 'voted-option' : ''}
+                      >
+                        {option.text}
+                      </button>
+                    ))}
+                  </div>
+                  {renderPollChart(selectedPoll)}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </React.Fragment>
+        )}
+
+        {searchMode === 'Users' && (
+          <div className="user-results">
+            {isSearchingUsers && (
+              <p className="empty-state">Searching users...</p>
+            )}
+
+            {!isSearchingUsers && searchTerm.trim() && userResults.map((user) => (
+              <div className="user-result" key={user.username}>
+                <div>
+                  <h4>{user.username}</h4>
+                  {user.name && <p>{user.name}</p>}
+                </div>
+                <button
+                  className={`follow-button user-result-follow${followingUsers.includes(user.username) ? ' following' : ''}`}
+                  onClick={() => toggleFollow(user.username)}
+                >
+                  {followingUsers.includes(user.username) ? 'Following' : 'Follow'}
+                </button>
+              </div>
+            ))}
+
+            {!isSearchingUsers && !searchTerm.trim() && (
+              <p className="empty-state">Search for a username.</p>
+            )}
+
+            {!isSearchingUsers && searchTerm.trim() && userResults.length === 0 && (
+              <p className="empty-state">No users found.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

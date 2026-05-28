@@ -13,6 +13,14 @@ router.get('/me/following', async (req, res) => {
   }
 });
 
+router.get('/search', async (req, res) => {
+  try {
+    res.json(await followService.searchUsers(req.query.q, req.user.username));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.post('/:username/follow', async (req, res) => {
   try {
     const result = await followService.followUser(req.user.username, req.params.username);
