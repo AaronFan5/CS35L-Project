@@ -5,6 +5,7 @@ const POLL_WITH_OPTIONS_SELECT = `
   question,
   category,
   creator_username,
+  is_open,
   poll_options (
     id,
     text,
@@ -12,6 +13,24 @@ const POLL_WITH_OPTIONS_SELECT = `
     option_index
   )
 `;
+
+function formatPoll(poll) {
+  const options = [...(poll.poll_options || [])]
+    .sort((a, b) => a.option_index - b.option_index)
+    .map((option) => ({
+      text: option.text,
+      votes: option.votes
+    }));
+
+  return {
+    id: poll.id,
+    question: poll.question,
+    category: poll.category,
+    creator: poll.creator_username,
+    isOpen: poll.is_open,
+    options
+  };
+}
 
 async function getAllPolls() {
   const { data, error } = await supabase
@@ -111,8 +130,42 @@ async function deletePoll(pollId, username) {
   return {};
 }
 
+async function getPollOption(pollId, optionIndex) {
+  const { data: option, error } = await supabase
+    .from('poll_options')
+    .select('id, poll_id, option_index, votes')
+    .eq('poll_id', pollId)
+    .eq('option_index', optionIndex)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return option;
+}
+
+async function getPollById(pollId) {
+  const { data: poll, error } = await supabase
+    .from('polls')
+    .select(POLL_WITH_OPTIONS_SELECT)
+    .eq('id', pollId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return formatPoll(poll);
+}
+
 async function voteOnPoll({ pollId, optionIndex, username }) {
   const option = await getPollOption(pollId, optionIndex);
+
+  const { data: pollData } = await supabase.from('polls').select('is_open').eq('id', pollId).single();
+  if (!pollData.is_open) {
+    return { status: 403, error: 'This poll is currently closed.' };
+  }
 
   if (!option) {
     return { status: 400, error: 'Invalid option' };
@@ -184,50 +237,24 @@ async function voteOnPoll({ pollId, optionIndex, username }) {
   return { poll: await getPollById(pollId) };
 }
 
-function formatPoll(poll) {
-  const options = [...(poll.poll_options || [])]
-    .sort((a, b) => a.option_index - b.option_index)
-    .map((option) => ({
-      text: option.text,
-      votes: option.votes
-    }));
-
-  return {
-    id: poll.id,
-    question: poll.question,
-    category: poll.category,
-    creator: poll.creator_username,
-    options
-  };
-}
-
-async function getPollOption(pollId, optionIndex) {
-  const { data: option, error } = await supabase
-    .from('poll_options')
-    .select('id, poll_id, option_index, votes')
-    .eq('poll_id', pollId)
-    .eq('option_index', optionIndex)
+async function togglePollStatus(pollId, username) {
+  const { data: poll, error: pollError } = await supabase
+    .from('polls')
+    .select('id, creator_username, is_open')
+    .eq('id', pollId)
     .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
+  if (pollError) throw pollError;
+  if (!poll) return { status: 404, error: 'Poll not found' };
+  if (poll.creator_username !== username) return { status: 403, error: 'Only the creator can close this poll.' };
 
-  return option;
-}
-
-async function getPollById(pollId) {
-  const { data: poll, error } = await supabase
+  const { error: updateError } = await supabase
     .from('polls')
-    .select(POLL_WITH_OPTIONS_SELECT)
-    .eq('id', pollId)
-    .single();
+    .update({ is_open: !poll.is_open })
+    .eq('id', pollId);
 
-  if (error) {
-    throw error;
-  }
-
-  return formatPoll(poll);
+  if (updateError) throw updateError;
+  return { poll: await getPollById(pollId) };
 }
 
 module.exports = {
@@ -235,5 +262,6 @@ module.exports = {
   getAllPolls,
   getUserVotes,
   voteOnPoll,
-  deletePoll
+  deletePoll,
+  togglePollStatus
 };
