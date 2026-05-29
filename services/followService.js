@@ -1,5 +1,8 @@
 const supabase = require('./supabaseClient');
 
+const USER_SEARCH_LIMIT = 10;
+const USER_SEARCH_MAX_LENGTH = 50;
+
 async function getFollowing(username) {
   const { data, error } = await supabase
     .from('follows')
@@ -12,6 +15,28 @@ async function getFollowing(username) {
   }
 
   return data.map((follow) => follow.followed_username);
+}
+
+async function searchUsers(query, currentUsername) {
+  const searchTerm = String(query || '').trim().slice(0, USER_SEARCH_MAX_LENGTH);
+
+  if (!searchTerm) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('name, username')
+    .ilike('username', `%${searchTerm}%`)
+    .neq('username', currentUsername)
+    .order('username', { ascending: true })
+    .limit(USER_SEARCH_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
 }
 
 async function followUser(followerUsername, followedUsername) {
@@ -68,5 +93,6 @@ async function unfollowUser(followerUsername, followedUsername) {
 module.exports = {
   followUser,
   getFollowing,
+  searchUsers,
   unfollowUser
 };
