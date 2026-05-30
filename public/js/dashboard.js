@@ -17,12 +17,22 @@ async function fetchUserVotes() {
 
 async function fetchPolls() {
   const response = await fetch('/polls/all');
-  return response.json();
+  const data = await response.json();
+
+  if(!response.ok) {
+    throw new Error(data.message || 'Failed to fetch polls');
+  }
+  return data;
 }
 
 async function fetchFollowing() {
   const response = await fetch('/users/me/following');
-  return response.json();
+  const data = await response.json();
+
+  if(!response.ok) {
+    throw new Error(data.message || 'Failed to fetch following users');
+  }
+  return data;
 }
 
 async function searchUsersRequest(query) {
@@ -110,10 +120,15 @@ function votesByPollId(votes) {
 
   if (Array.isArray(votes)) {
     votes.forEach((vote) => {
-      votesMap[vote.pollId] = vote.optionIndex;
+      if(!votesMap[vote.pollId]) {
+        votesMap[vote.pollId] = [];
+      }
+      votesMap[vote.pollId].push(vote.optionIndex);
     });
   }
-
+  for(const pollId in votesMap) {
+    votesMap[pollId] = votesMap[pollId].join(',');
+  }
   return votesMap;
 }
 
@@ -121,7 +136,7 @@ function filterPolls(polls, { viewMode, currentUser, userVotes, followingUsers, 
   return polls
     .filter(poll => {
       if (viewMode === 'Mine') return poll.creator === currentUser;
-      if (viewMode === 'Voted') return userVotes.hasOwnProperty(poll.id);
+      if (viewMode === 'Voted') return userVotes.hasOwnProperty(poll.id) && userVotes[poll.id].length > 0;
       if (viewMode === 'Following') return followingUsers.includes(poll.creator);
       return true;
     })
@@ -144,6 +159,7 @@ function Dashboard() {
   const [userResults, setUserResults] = useState([]);
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [viewMode, setViewMode] = useState('All');
+  const [votingType, setVotingType] = useState('single');
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
 
@@ -233,11 +249,12 @@ function Dashboard() {
     if (optionsArray.length < 2) { alert('Please enter at least 2 options.'); return; }
 
     try {
-      const newPoll = await createPollRequest({ question, options: optionsArray, category });
+      const newPoll = await createPollRequest({ question, options: optionsArray, category, votingType });
       setPolls([...polls, newPoll]);
       setSelectedPollId(newPoll.id);
       setQuestion('');
       setOptions(['', '']);
+      setVotingType('single');
     } catch (error) {
       alert(error.message);
       return;
@@ -273,24 +290,73 @@ function Dashboard() {
     }
   };
 
-  const handleVote = async (pollId, optionIndex) => {
+const handleVote = async (pollId, optionIndex) => {
+    const poll = polls.find((p) => p.id === pollId);
+    const votingType = poll.votingType || 'single';
     let updatedPoll;
 
     try {
-      updatedPoll = await voteOnPollRequest(pollId, optionIndex);
+      if (votingType === 'ranked') {
+        let currentRanks = userVotes[pollId] ? String(userVotes[pollId]).split(',').filter(Boolean).map(Number) : [];
+        
+        if (currentRanks.includes(optionIndex)) {
+          currentRanks = currentRanks.filter((idx) => idx !== optionIndex);
+        } else {
+          currentRanks.push(optionIndex);
+        }
+
+        const response = await fetch('/polls/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pollId, rankedChoices: currentRanks })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save ranked vote');
+        }
+        const responseData = await response.json();
+        updatedPoll = responseData.poll ? responseData.poll : responseData;
+
+        const newUserVotes = { ...userVotes };
+        if (currentRanks.length === 0) {
+          delete newUserVotes[pollId];
+        } else {
+          newUserVotes[pollId] = currentRanks.join(',');
+        }
+        setUserVotes(newUserVotes);
+
+      } else {
+        updatedPoll = await voteOnPollRequest(pollId, optionIndex);
+        const newUserVotes = { ...userVotes };
+
+        if (votingType === 'multiple') {
+          let currentChoices = userVotes[pollId] ? String(userVotes[pollId]).split(',').filter(Boolean).map(Number) : [];
+          
+          if (currentChoices.includes(optionIndex)) {
+            currentChoices = currentChoices.filter((idx) => idx !== optionIndex);
+          } else {
+            currentChoices.push(optionIndex);
+          }
+
+          if (currentChoices.length === 0) {
+            delete newUserVotes[pollId];
+          } else {
+            newUserVotes[pollId] = currentChoices.join(',');
+          }
+        } else {
+          if (userVotes[pollId] === optionIndex) {
+            delete newUserVotes[pollId];
+          } else {
+            newUserVotes[pollId] = optionIndex;
+          }
+        }
+        setUserVotes(newUserVotes);
+      }
+
+      setPolls(polls.map((p) => p.id === pollId ? updatedPoll.poll : p));
     } catch (error) {
       alert(error.message);
-      return;
     }
-
-    setPolls(polls.map((poll) => poll.id === pollId ? updatedPoll : poll));
-    const newUserVotes = { ...userVotes };
-    if (userVotes[pollId] === optionIndex) {
-      delete newUserVotes[pollId];
-    } else {
-      newUserVotes[pollId] = optionIndex;
-    }
-    setUserVotes(newUserVotes);
   };
 
   const toggleFollow = async (username) => {
@@ -386,6 +452,12 @@ function Dashboard() {
               <option value="Food">Food</option>
               <option value="Location">Location</option>
               <option value="Opinion">Opinion</option>
+            </select>
+
+            <select value={votingType} onChange={(e) => setVotingType(e.target.value)}>
+              <option value="single">Single</option>
+              <option value="multiple">Multiple</option>
+              <option value="ranked">Ranked Choice</option>
             </select>
             <button onClick={createPoll}>Create poll</button>
           </div>
@@ -485,17 +557,27 @@ function Dashboard() {
                   )}
 
                   <div className="poll-options">
-                    {selectedPoll.options.map((option, index) => (
-                      <button
-                        key={index}
-                        onClick={() => handleVote(selectedPoll.id, index)}
-                        className={userVotes[selectedPoll.id] === index ? 'voted-option' : ''}
-                        disabled={!selectedPoll.isOpen}
-                        style={{ opacity: !selectedPoll.isOpen ? 0.6 : 1, cursor: !selectedPoll.isOpen ? 'not-allowed' : 'pointer' }}
-                      >
-                        {option.text} ({option.votes})
-                      </button>
-                    ))}
+                    {selectedPoll.options.map((option, index) => {
+                      const votingType = selectedPoll.votingType || 'single';
+                      let isVoted = false;
+
+                      if (votingType === 'single') {
+                        isVoted = String(userVotes[selectedPoll.id]) === String(index);
+                      } else {
+                        const savedSelections = userVotes[selectedPoll.id] ? String(userVotes[selectedPoll.id]).split(',').filter(Boolean) : [];
+                        isVoted = savedSelections.includes(String(index));
+                      }
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => handleVote(selectedPoll.id, index)}
+                          className={isVoted ? 'voted-option' : ''}
+                          disabled={!selectedPoll.isOpen}
+                        >
+                          {option.text} ({option.votes})
+                        </button>
+                      );
+                    })}
                   </div>
                   {renderPollChart(selectedPoll)}
                 </div>
