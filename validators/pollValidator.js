@@ -44,7 +44,7 @@ function normalizeCreatePollInput({ question, options, category, votingType }) {
     question: question.trim(),
     options: options.map((option) => option.trim()).filter((option) => option.length > 0),
     category: category || 'Opinion',
-    votingType: votingType || 'Single'
+    votingType: votingType || 'single'
   };
 }
 

@@ -1,3 +1,5 @@
+create extension if not exists "pgcrypto";
+
 create table if not exists users (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -21,8 +23,10 @@ create table if not exists polls (
   question text not null,
   category text not null default 'Opinion',
   creator_username text not null references users(username) on delete cascade,
-  created_at timestamptz not null default now()
-  is_open boolean not null default true
+  created_at timestamptz not null default now(),
+  is_open boolean not null default true,
+  voting_type text not null default 'single',
+  check (voting_type in ('single', 'multiple', 'ranked'))
 );
 
 create table if not exists poll_options (
@@ -31,6 +35,7 @@ create table if not exists poll_options (
   text text not null,
   option_index integer not null,
   votes integer not null default 0,
+  image_path text,
   unique (poll_id, option_index)
 );
 
@@ -41,5 +46,6 @@ create table if not exists votes (
   username text not null references users(username) on delete cascade,
   option_index integer not null,
   created_at timestamptz not null default now(),
-  unique (username, poll_id)
+  rank integer,
+  unique (username, poll_id, option_id)
 );

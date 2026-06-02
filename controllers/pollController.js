@@ -70,7 +70,7 @@ async function voteOnPoll(req, res) {
   try {
     const result = await pollService.voteOnPoll(voteData);
     if (result.error) return res.status(result.status).json({ message: result.error });
-    res.json(result.poll);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -81,7 +81,7 @@ async function togglePollStatus(req, res) {
   try {
     const result = await pollService.togglePollStatus(pollId, req.user.username);
     if (result.error) return res.status(result.status).json({ message: result.error });
-    res.json(result.poll);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

@@ -344,7 +344,7 @@ const handleVote = async (pollId, optionIndex) => {
             newUserVotes[pollId] = currentChoices.join(',');
           }
         } else {
-          if (userVotes[pollId] === optionIndex) {
+          if (String(userVotes[pollId]) === String(optionIndex)) {
             delete newUserVotes[pollId];
           } else {
             newUserVotes[pollId] = optionIndex;
@@ -353,7 +353,7 @@ const handleVote = async (pollId, optionIndex) => {
         setUserVotes(newUserVotes);
       }
 
-      setPolls(polls.map((p) => p.id === pollId ? updatedPoll.poll : p));
+      setPolls(polls.map((p) => p.id === pollId ? updatedPoll : p));
     } catch (error) {
       alert(error.message);
     }

@@ -72,7 +72,7 @@ async function createPoll({ question, options, creator, category, votingType }) 
       creator_username: creator,
       voting_type: votingType || 'single'
     })
-    .select('id, question, category, creator_username, voting_type')
+    .select('id, question, category, creator_username, is_open, voting_type')
     .single();
 
   if (pollError) {
@@ -352,7 +352,41 @@ async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
 
   if (existingVote) {
     if (existingVote.option_index !== optionIndex) {
-      return { status: 400, error: 'You already voted on this poll' };
+      const oldOption = await getPollOption(pollId, existingVote.option_index);
+
+      if (oldOption) {
+        const { error: decrementOldOptionError } = await supabase
+          .from('poll_options')
+          .update({ votes: Math.max(oldOption.votes - 1, 0) })
+          .eq('id', oldOption.id);
+
+        if (decrementOldOptionError) {
+          throw decrementOldOptionError;
+        }
+      }
+
+      const { error: updateVoteError } = await supabase
+        .from('votes')
+        .update({
+          option_id: option.id,
+          option_index: optionIndex
+        })
+        .eq('id', existingVote.id);
+
+      if (updateVoteError) {
+        throw updateVoteError;
+      }
+
+      const { error: incrementNewOptionError } = await supabase
+        .from('poll_options')
+        .update({ votes: option.votes + 1 })
+        .eq('id', option.id);
+
+      if (incrementNewOptionError) {
+        throw incrementNewOptionError;
+      }
+
+      return await getPollById(pollId);
     }
 
     const { error: deleteVoteError } = await supabase
