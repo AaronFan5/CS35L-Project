@@ -1,7 +1,8 @@
 const VALID_CATEGORIES = new Set(['Food', 'Location', 'Opinion']);
+const VALID_CLOSE_AFTER_MINUTES = new Set([null, 10, 60, 360, 1440]);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function validateCreatePollInput({ question, options, category, votingType, maxChoices } = {}) {
+function validateCreatePollInput({ question, options, category, votingType, maxChoices, closeAfterMinutes } = {}) {
   if (typeof question !== 'string' || question.trim().length === 0) {
     return 'Question is required';
   }
@@ -50,10 +51,14 @@ function validateCreatePollInput({ question, options, category, votingType, maxC
     }
   }
 
+  if (!VALID_CLOSE_AFTER_MINUTES.has(closeAfterMinutes ?? null)) {
+    return 'Invalid poll timer';
+  }
+
   return null;
 }
 
-function normalizeCreatePollInput({ question, options, category, votingType, maxChoices }) {
+function normalizeCreatePollInput({ question, options, category, votingType, maxChoices, closeAfterMinutes }) {
   const normalizedVotingType = votingType || 'single';
 
   return {
@@ -61,7 +66,8 @@ function normalizeCreatePollInput({ question, options, category, votingType, max
     options: options.map((option) => option.trim()).filter((option) => option.length > 0),
     category: category || 'Opinion',
     votingType: normalizedVotingType,
-    maxChoices: normalizedVotingType === 'multiple' ? maxChoices : null
+    maxChoices: normalizedVotingType === 'multiple' ? maxChoices : null,
+    closeAfterMinutes: closeAfterMinutes ?? null
   };
 }
 

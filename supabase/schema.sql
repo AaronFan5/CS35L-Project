@@ -27,6 +27,7 @@ create table if not exists polls (
   is_open boolean not null default true,
   voting_type text not null default 'single',
   max_choices integer,
+  closes_at timestamptz,
   check (voting_type in ('single', 'multiple', 'ranked')),
   check (max_choices is null or max_choices >= 1)
 );

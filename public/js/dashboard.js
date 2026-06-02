@@ -144,6 +144,23 @@ function filterPolls(polls, { viewMode, currentUser, userVotes, followingUsers, 
     .filter(poll => poll.question.toLowerCase().includes(searchTerm.toLowerCase()));
 }
 
+function formatTimeRemaining(closesAt, now) {
+  if (!closesAt) return '';
+
+  const remainingMs = new Date(closesAt).getTime() - now;
+
+  if (remainingMs <= 0) return 'Closed';
+
+  const totalSeconds = Math.ceil(remainingMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 function Dashboard() {
   const [currentUser, setCurrentUser] = useState('');
   const [polls, setPolls] = useState([]);
@@ -161,8 +178,13 @@ function Dashboard() {
   const [viewMode, setViewMode] = useState('All');
   const [votingType, setVotingType] = useState('single');
   const [maxChoices, setMaxChoices] = useState('1');
+  const [closeAfterMinutes, setCloseAfterMinutes] = useState('');
+  const [now, setNow] = useState(Date.now());
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
+  const selectedPollIsOpen = selectedPoll
+    ? selectedPoll.isOpen && (!selectedPoll.closesAt || new Date(selectedPoll.closesAt).getTime() > now)
+    : false;
 
   const filteredPolls = filterPolls(polls, {
     viewMode,
@@ -202,6 +224,14 @@ function Dashboard() {
       setSelectedPollId(filteredPolls[0].id);
     }
   }, [activeFilter, followingUsers, polls, viewMode]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const query = searchTerm.trim();
@@ -255,7 +285,8 @@ function Dashboard() {
         options: optionsArray,
         category,
         votingType,
-        maxChoices: votingType === 'multiple' ? Number(maxChoices) : null
+        maxChoices: votingType === 'multiple' ? Number(maxChoices) : null,
+        closeAfterMinutes: closeAfterMinutes ? Number(closeAfterMinutes) : null
       });
       setPolls([...polls, newPoll]);
       setSelectedPollId(newPoll.id);
@@ -263,6 +294,7 @@ function Dashboard() {
       setOptions(['', '']);
       setVotingType('single');
       setMaxChoices('1');
+      setCloseAfterMinutes('');
     } catch (error) {
       alert(error.message);
       return;
@@ -487,6 +519,14 @@ const handleVote = async (pollId, optionIndex) => {
                 aria-label="Maximum choices per voter"
               />
             )}
+
+            <select value={closeAfterMinutes} onChange={(e) => setCloseAfterMinutes(e.target.value)}>
+              <option value="">No timer</option>
+              <option value="10">10 minutes</option>
+              <option value="60">1 hour</option>
+              <option value="360">6 hours</option>
+              <option value="1440">1 day</option>
+            </select>
             <button onClick={createPoll}>Create poll</button>
           </div>
         </div>
@@ -565,8 +605,15 @@ const handleVote = async (pollId, optionIndex) => {
                   {selectedPoll.votingType === 'multiple' && selectedPoll.maxChoices && (
                     <p className="poll-meta">Choose up to {selectedPoll.maxChoices} options.</p>
                   )}
+                  {selectedPoll.closesAt && (
+                    <p className="poll-meta">
+                      {formatTimeRemaining(selectedPoll.closesAt, now) === 'Closed'
+                        ? 'Timer expired'
+                        : `Closes in ${formatTimeRemaining(selectedPoll.closesAt, now)}`}
+                    </p>
+                  )}
 
-                  {!selectedPoll.isOpen && <p style={{ color: '#7c2d12', fontWeight: 'bold' }}>🔒 This poll is closed to new votes.</p>}
+                  {!selectedPollIsOpen && <p style={{ color: '#7c2d12', fontWeight: 'bold' }}>🔒 This poll is closed to new votes.</p>}
 
                   {selectedPoll.creator !== currentUser && (
                     <button
@@ -582,7 +629,7 @@ const handleVote = async (pollId, optionIndex) => {
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                       <button onClick={() => deletePoll(selectedPoll.id)} className="delete-poll-button">Delete Poll</button>
                       <button onClick={() => togglePollStatus(selectedPoll.id)} className="btn-ghost">
-                        {selectedPoll.isOpen ? 'Close Poll' : 'Reopen Poll'}
+                        {selectedPollIsOpen ? 'Close Poll' : 'Reopen Poll'}
                       </button>
                     </div>
                   )}
@@ -604,7 +651,7 @@ const handleVote = async (pollId, optionIndex) => {
                           key={index}
                           onClick={() => handleVote(selectedPoll.id, index)}
                           className={isVoted ? 'voted-option' : ''}
-                          disabled={!selectedPoll.isOpen}
+                          disabled={!selectedPollIsOpen}
                         >
                           <span className="poll-option-main">
                             <span>{option.text}</span>

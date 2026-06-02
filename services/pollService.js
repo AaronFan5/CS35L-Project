@@ -8,6 +8,7 @@ const POLL_WITH_OPTIONS_SELECT = `
   is_open,
   voting_type,
   max_choices,
+  closes_at,
   poll_options (
     id,
     text,
@@ -15,6 +16,22 @@ const POLL_WITH_OPTIONS_SELECT = `
     option_index
   )
 `;
+
+function isPollExpired(closesAt) {
+  return Boolean(closesAt) && new Date(closesAt) <= new Date();
+}
+
+function getEffectiveIsOpen(poll) {
+  return poll.is_open && !isPollExpired(poll.closes_at);
+}
+
+function getClosesAt(closeAfterMinutes) {
+  if (!closeAfterMinutes) return null;
+
+  const closesAt = new Date();
+  closesAt.setMinutes(closesAt.getMinutes() + closeAfterMinutes);
+  return closesAt.toISOString();
+}
 
 function formatPoll(poll) {
   const options = [...(poll.poll_options || [])]
@@ -29,9 +46,10 @@ function formatPoll(poll) {
     question: poll.question,
     category: poll.category,
     creator: poll.creator_username,
-    isOpen: poll.is_open,
+    isOpen: getEffectiveIsOpen(poll),
     votingType: poll.voting_type,
     maxChoices: poll.max_choices,
+    closesAt: poll.closes_at,
     options
   };
 }
@@ -65,7 +83,7 @@ async function getUserVotes(username) {
   }));
 }
 
-async function createPoll({ question, options, creator, category, votingType, maxChoices }) {
+async function createPoll({ question, options, creator, category, votingType, maxChoices, closeAfterMinutes }) {
   const { data: poll, error: pollError } = await supabase
     .from('polls')
     .insert({
@@ -73,9 +91,10 @@ async function createPoll({ question, options, creator, category, votingType, ma
       category: category || 'Opinion',
       creator_username: creator,
       voting_type: votingType || 'single',
-      max_choices: maxChoices
+      max_choices: maxChoices,
+      closes_at: getClosesAt(closeAfterMinutes)
     })
-    .select('id, question, category, creator_username, is_open, voting_type, max_choices')
+    .select('id, question, category, creator_username, is_open, voting_type, max_choices, closes_at')
     .single();
 
   if (pollError) {
@@ -209,7 +228,7 @@ async function recalculateRankedPollScores(pollId, totalOptionsCount) {
 async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
   const { data: pollData, error: pollFetchError } = await supabase
     .from('polls')
-    .select('is_open, voting_type, max_choices')
+    .select('is_open, voting_type, max_choices, closes_at')
     .eq('id', pollId)
     .single();
 
@@ -217,7 +236,7 @@ async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
     return { status: 404, error: 'Poll not found' };
   }
 
-  if (!pollData.is_open) {
+  if (!getEffectiveIsOpen(pollData)) {
     return { status: 403, error: 'This poll is currently closed.' };
   }
 
@@ -467,7 +486,7 @@ async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
 async function togglePollStatus(pollId, username) {
   const { data: poll, error: pollError } = await supabase
     .from('polls')
-    .select('id, creator_username, is_open')
+    .select('id, creator_username, is_open, closes_at')
     .eq('id', pollId)
     .maybeSingle();
 
@@ -475,9 +494,14 @@ async function togglePollStatus(pollId, username) {
   if (!poll) return { status: 404, error: 'Poll not found' };
   if (poll.creator_username !== username) return { status: 403, error: 'Only the creator can close this poll.' };
 
+  const isOpen = getEffectiveIsOpen(poll);
+  const updateFields = isOpen
+    ? { is_open: false }
+    : { is_open: true, closes_at: null };
+
   const { error: updateError } = await supabase
     .from('polls')
-    .update({ is_open: !poll.is_open })
+    .update(updateFields)
     .eq('id', pollId);
 
   if (updateError) throw updateError;
