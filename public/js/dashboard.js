@@ -403,17 +403,22 @@ const handleVote = async (pollId, optionIndex) => {
 
   const renderPollChart = (poll) => {
     const highestVoteCount = Math.max(...poll.options.map((o) => o.votes), 1);
+    const totalVotes = poll.options.reduce((sum, o) => sum + o.votes, 0);
     return (
       <div className="poll-chart">
-        {poll.options.map((option, index) => (
-          <div key={index} className="chart-row">
-            <span className="chart-label">{option.text}</span>
-            <div className="chart-track">
-              <div className="chart-bar" style={{ width: `${(option.votes / highestVoteCount) * 100}%` }}></div>
+        <div className="poll-total">{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</div>
+        {poll.options.map((option, index) => {
+          const percent = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
+          return (
+            <div key={index} className="chart-row">
+              <span className="chart-label">{option.text}</span>
+              <div className="chart-track">
+                <div className="chart-bar" style={{ width: `${(option.votes / highestVoteCount) * 100}%` }}></div>
+              </div>
+              <span className="chart-count">{option.votes} ({percent}%)</span>
             </div>
-            <span className="chart-count">{option.votes}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
