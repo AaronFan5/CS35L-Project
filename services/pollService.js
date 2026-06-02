@@ -7,6 +7,7 @@ const POLL_WITH_OPTIONS_SELECT = `
   creator_username,
   is_open,
   voting_type,
+  max_choices,
   poll_options (
     id,
     text,
@@ -30,6 +31,7 @@ function formatPoll(poll) {
     creator: poll.creator_username,
     isOpen: poll.is_open,
     votingType: poll.voting_type,
+    maxChoices: poll.max_choices,
     options
   };
 }
@@ -63,16 +65,17 @@ async function getUserVotes(username) {
   }));
 }
 
-async function createPoll({ question, options, creator, category, votingType }) {
+async function createPoll({ question, options, creator, category, votingType, maxChoices }) {
   const { data: poll, error: pollError } = await supabase
     .from('polls')
     .insert({
       question,
       category: category || 'Opinion',
       creator_username: creator,
-      voting_type: votingType || 'single'
+      voting_type: votingType || 'single',
+      max_choices: maxChoices
     })
-    .select('id, question, category, creator_username, is_open, voting_type')
+    .select('id, question, category, creator_username, is_open, voting_type, max_choices')
     .single();
 
   if (pollError) {
@@ -162,10 +165,51 @@ async function getPollById(pollId) {
   return formatPoll(poll);
 }
 
+async function recalculateRankedPollScores(pollId, totalOptionsCount) {
+  const { data: options, error: optionsError } = await supabase
+    .from('poll_options')
+    .select('id')
+    .eq('poll_id', pollId);
+
+  if (optionsError) {
+    throw optionsError;
+  }
+
+  const scoreByOptionId = {};
+  options.forEach((option) => {
+    scoreByOptionId[option.id] = 0;
+  });
+
+  const { data: rankedVotes, error: votesError } = await supabase
+    .from('votes')
+    .select('option_id, rank')
+    .eq('poll_id', pollId);
+
+  if (votesError) {
+    throw votesError;
+  }
+
+  rankedVotes.forEach((vote) => {
+    if (vote.rank === null || vote.rank === undefined) return;
+    scoreByOptionId[vote.option_id] += totalOptionsCount - vote.rank;
+  });
+
+  await Promise.all(options.map(async (option) => {
+    const { error: updateError } = await supabase
+      .from('poll_options')
+      .update({ votes: scoreByOptionId[option.id] })
+      .eq('id', option.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+  }));
+}
+
 async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
   const { data: pollData, error: pollFetchError } = await supabase
     .from('polls')
-    .select('is_open, voting_type')
+    .select('is_open, voting_type, max_choices')
     .eq('id', pollId)
     .single();
 
@@ -219,6 +263,25 @@ async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
       return await getPollById(pollId);
     }
 
+    if (pollData.max_choices !== null) {
+      const { count, error: countError } = await supabase
+        .from('votes')
+        .select('id', { count: 'exact', head: true })
+        .eq('username', username)
+        .eq('poll_id', pollId);
+
+      if (countError) {
+        throw countError;
+      }
+
+      if (count >= pollData.max_choices) {
+        return {
+          status: 400,
+          error: `You can only vote for ${pollData.max_choices} option${pollData.max_choices === 1 ? '' : 's'}.`
+        };
+      }
+    }
+
     const { error: insertVoteError } = await supabase
       .from('votes')
       .insert({
@@ -251,7 +314,7 @@ async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
 
     const { data: allOptions, error: allOptionsError } = await supabase
       .from('poll_options')
-      .select('id, option_index, votes')
+      .select('id, option_index')
       .eq('poll_id', pollId);
 
     if (allOptionsError) {
@@ -260,43 +323,14 @@ async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
 
     const totalOptionsCount = allOptions.length;
 
-    const { data: oldVotes, error: oldVotesError } = await supabase
+    const { error: cleanError } = await supabase
       .from('votes')
-      .select('option_id, rank')
+      .delete()
       .eq('username', username)
       .eq('poll_id', pollId);
 
-    if (oldVotesError) {
-      throw oldVotesError;
-    }
-
-    if (oldVotes && oldVotes.length > 0) {
-      for (let i = 0; i < oldVotes.length; i++) {
-        const oldVote = oldVotes[i];
-        const matchOpt = allOptions.find(o => o.id === oldVote.option_id);
-        if (matchOpt) {
-          const pointsToRemove = totalOptionsCount - oldVote.rank;
-          const { error: decError } = await supabase
-            .from('poll_options')
-            .update({ votes: Math.max(matchOpt.votes - pointsToRemove, 0) })
-            .eq('id', matchOpt.id);
-
-          if (decError) {
-            throw decError;
-          }
-          matchOpt.votes = Math.max(matchOpt.votes - pointsToRemove, 0);
-        }
-      }
-
-      const { error: cleanError } = await supabase
-        .from('votes')
-        .delete()
-        .eq('username', username)
-        .eq('poll_id', pollId);
-
-      if (cleanError) {
-        throw cleanError;
-      }
+    if (cleanError) {
+      throw cleanError;
     }
 
     for (let currentRank = 0; currentRank < rankedChoices.length; currentRank++) {
@@ -319,17 +353,9 @@ async function voteOnPoll({ pollId, optionIndex, rankedChoices, username }) {
       if (rankInsertError) {
         throw rankInsertError;
       }
-
-      const pointsToAdd = totalOptionsCount - currentRank;
-      const { error: rankIncrementError } = await supabase
-        .from('poll_options')
-        .update({ votes: matchOpt.votes + pointsToAdd })
-        .eq('id', matchOpt.id);
-
-      if (rankIncrementError) {
-        throw rankIncrementError;
-      }
     }
+
+    await recalculateRankedPollScores(pollId, totalOptionsCount);
 
     return await getPollById(pollId);
   }

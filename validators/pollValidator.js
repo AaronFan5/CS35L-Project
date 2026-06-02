@@ -1,7 +1,7 @@
 const VALID_CATEGORIES = new Set(['Food', 'Location', 'Opinion']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function validateCreatePollInput({ question, options, category, votingType } = {}) {
+function validateCreatePollInput({ question, options, category, votingType, maxChoices } = {}) {
   if (typeof question !== 'string' || question.trim().length === 0) {
     return 'Question is required';
   }
@@ -36,15 +36,32 @@ function validateCreatePollInput({ question, options, category, votingType } = {
     return 'Invalid voting type';
   }
 
+  if (votingType === 'multiple') {
+    if (!Number.isInteger(maxChoices)) {
+      return 'Max choices must be an integer';
+    }
+
+    if (maxChoices < 1) {
+      return 'Max choices must be at least 1';
+    }
+
+    if (maxChoices > normalizedOptions.length) {
+      return 'Max choices cannot be greater than the number of options';
+    }
+  }
+
   return null;
 }
 
-function normalizeCreatePollInput({ question, options, category, votingType }) {
+function normalizeCreatePollInput({ question, options, category, votingType, maxChoices }) {
+  const normalizedVotingType = votingType || 'single';
+
   return {
     question: question.trim(),
     options: options.map((option) => option.trim()).filter((option) => option.length > 0),
     category: category || 'Opinion',
-    votingType: votingType || 'single'
+    votingType: normalizedVotingType,
+    maxChoices: normalizedVotingType === 'multiple' ? maxChoices : null
   };
 }
 
@@ -58,8 +75,8 @@ function validateVoteInput({ pollId, optionIndex, rankedChoices } = {}) {
   }
 
   if(rankedChoices != undefined){
-    if(!Array.isArray(rankedChoices) || rankedChoices.length == 0) {
-      return 'Ranked choices cannot be empty';
+    if(!Array.isArray(rankedChoices)) {
+      return 'Ranked choices must be an array';
     }
     if(rankedChoices.some(idx => !Number.isInteger(idx) || idx < 0)) {
       return 'Ranked choices need to be a non-negative integer';

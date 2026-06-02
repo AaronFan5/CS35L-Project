@@ -160,6 +160,7 @@ function Dashboard() {
   const [isSearchingUsers, setIsSearchingUsers] = useState(false);
   const [viewMode, setViewMode] = useState('All');
   const [votingType, setVotingType] = useState('single');
+  const [maxChoices, setMaxChoices] = useState('1');
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
 
@@ -249,12 +250,19 @@ function Dashboard() {
     if (optionsArray.length < 2) { alert('Please enter at least 2 options.'); return; }
 
     try {
-      const newPoll = await createPollRequest({ question, options: optionsArray, category, votingType });
+      const newPoll = await createPollRequest({
+        question,
+        options: optionsArray,
+        category,
+        votingType,
+        maxChoices: votingType === 'multiple' ? Number(maxChoices) : null
+      });
       setPolls([...polls, newPoll]);
       setSelectedPollId(newPoll.id);
       setQuestion('');
       setOptions(['', '']);
       setVotingType('single');
+      setMaxChoices('1');
     } catch (error) {
       alert(error.message);
       return;
@@ -294,6 +302,7 @@ const handleVote = async (pollId, optionIndex) => {
     const poll = polls.find((p) => p.id === pollId);
     const votingType = poll.votingType || 'single';
     let updatedPoll;
+    const previousUserVotes = { ...userVotes };
 
     try {
       if (votingType === 'ranked') {
@@ -305,6 +314,14 @@ const handleVote = async (pollId, optionIndex) => {
           currentRanks.push(optionIndex);
         }
 
+        const optimisticUserVotes = { ...userVotes };
+        if (currentRanks.length === 0) {
+          delete optimisticUserVotes[pollId];
+        } else {
+          optimisticUserVotes[pollId] = currentRanks.join(',');
+        }
+        setUserVotes(optimisticUserVotes);
+
         const response = await fetch('/polls/vote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -312,18 +329,11 @@ const handleVote = async (pollId, optionIndex) => {
         });
 
         if (!response.ok) {
-          throw new Error('Failed to save ranked vote');
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to save ranked vote');
         }
         const responseData = await response.json();
         updatedPoll = responseData.poll ? responseData.poll : responseData;
-
-        const newUserVotes = { ...userVotes };
-        if (currentRanks.length === 0) {
-          delete newUserVotes[pollId];
-        } else {
-          newUserVotes[pollId] = currentRanks.join(',');
-        }
-        setUserVotes(newUserVotes);
 
       } else {
         updatedPoll = await voteOnPollRequest(pollId, optionIndex);
@@ -355,6 +365,9 @@ const handleVote = async (pollId, optionIndex) => {
 
       setPolls(polls.map((p) => p.id === pollId ? updatedPoll : p));
     } catch (error) {
+      if (votingType === 'ranked') {
+        setUserVotes(previousUserVotes);
+      }
       alert(error.message);
     }
   };
@@ -459,6 +472,16 @@ const handleVote = async (pollId, optionIndex) => {
               <option value="multiple">Multiple</option>
               <option value="ranked">Ranked Choice</option>
             </select>
+
+            {votingType === 'multiple' && (
+              <input
+                type="number"
+                min="1"
+                value={maxChoices}
+                onChange={(e) => setMaxChoices(e.target.value)}
+                aria-label="Maximum choices per voter"
+              />
+            )}
             <button onClick={createPoll}>Create poll</button>
           </div>
         </div>
@@ -534,6 +557,9 @@ const handleVote = async (pollId, optionIndex) => {
                   <p className="poll-meta">
                     Category: <strong>{selectedPoll.category}</strong> &middot; by {selectedPoll.creator}
                   </p>
+                  {selectedPoll.votingType === 'multiple' && selectedPoll.maxChoices && (
+                    <p className="poll-meta">Choose up to {selectedPoll.maxChoices} options.</p>
+                  )}
 
                   {!selectedPoll.isOpen && <p style={{ color: '#7c2d12', fontWeight: 'bold' }}>🔒 This poll is closed to new votes.</p>}
 
@@ -559,12 +585,13 @@ const handleVote = async (pollId, optionIndex) => {
                   <div className="poll-options">
                     {selectedPoll.options.map((option, index) => {
                       const votingType = selectedPoll.votingType || 'single';
+                      const savedSelections = userVotes[selectedPoll.id] ? String(userVotes[selectedPoll.id]).split(',').filter(Boolean) : [];
+                      const rankPosition = votingType === 'ranked' ? savedSelections.indexOf(String(index)) : -1;
                       let isVoted = false;
 
                       if (votingType === 'single') {
                         isVoted = String(userVotes[selectedPoll.id]) === String(index);
                       } else {
-                        const savedSelections = userVotes[selectedPoll.id] ? String(userVotes[selectedPoll.id]).split(',').filter(Boolean) : [];
                         isVoted = savedSelections.includes(String(index));
                       }
                       return (
@@ -574,7 +601,15 @@ const handleVote = async (pollId, optionIndex) => {
                           className={isVoted ? 'voted-option' : ''}
                           disabled={!selectedPoll.isOpen}
                         >
-                          {option.text} ({option.votes})
+                          <span className="poll-option-main">
+                            <span>{option.text}</span>
+                            <span className="poll-option-votes">
+                              {option.votes} {votingType === 'ranked' ? 'points' : 'votes'}
+                            </span>
+                          </span>
+                          {rankPosition >= 0 && (
+                            <span className="rank-badge">Rank {rankPosition + 1}</span>
+                          )}
                         </button>
                       );
                     })}

@@ -449,6 +449,10 @@ label {
 .poll-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
 
 .poll-options button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   text-align: left;
   background: #f7f4ed;
   color: #1c1c1c;
@@ -458,6 +462,27 @@ label {
   font-size: 0.9375rem;
   box-shadow: none;
   transition: border-color 0.15s, background 0.15s;
+}
+
+.poll-option-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.poll-option-votes {
+  color: #5f5f5d;
+  font-size: 0.8125rem;
+}
+
+.rank-badge {
+  flex: 0 0 auto;
+  border: 1px solid rgba(28,28,28,0.16);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .poll-options button:hover { border-color: rgba(28,28,28,0.4); opacity: 1; background: rgba(28,28,28,0.03); }
@@ -470,6 +495,14 @@ label {
     rgba(255,255,255,0.2) 0px 0.5px 0px 0px inset,
     rgba(0,0,0,0.2) 0px 0px 0px 0.5px inset,
     rgba(0,0,0,0.05) 0px 1px 2px 0px;
+}
+
+.poll-options button.voted-option .poll-option-votes {
+  color: rgba(252,251,248,0.72);
+}
+
+.poll-options button.voted-option .rank-badge {
+  border-color: rgba(252,251,248,0.35);
 }
 
 
