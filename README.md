@@ -53,7 +53,7 @@ graph LR
   Browser["Browser (React)"] -->|HTTP + JWT cookie| Express["Express Server"]
   Express -->|Supabase JS SDK| DB[("Supabase / Postgres")]
   Express -->|serves static files| Browser
-  Express -->|JWT verification| Auth["Protected API Routes"]
+  Express -->|requireAuth middleware| Protected["Protected poll/user routes"]
 ```
 
 The frontend is a set of static HTML pages served by Express. Each page loads a React component over CDN that talks to the Express API via `fetch`. Express verifies the JWT cookie on protected routes and proxies data operations to Supabase. Supabase stores users, follow relationships, polls, poll options, votes, ranked choices, poll status, and timers.
@@ -71,8 +71,10 @@ sequenceDiagram
   DB-->>S: user row
   S->>S: sign JWT with username
   S-->>C: Set-Cookie token=JWT (HTTP-only)
-  C->>S: GET /polls/all (cookie sent automatically)
-  S->>S: verify JWT
+  C->>S: GET /auth/me (cookie sent automatically)
+  S->>S: verify JWT cookie
+  S-->>C: current username
+  C->>S: GET /polls/all
   S->>DB: SELECT polls + options
   DB-->>S: poll data
   S-->>C: JSON response
