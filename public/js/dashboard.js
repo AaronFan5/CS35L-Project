@@ -1,4 +1,5 @@
 const { useEffect, useState } = React;
+const POLLS_PER_PAGE = 10;
 
 async function fetchCurrentUser() {
   const response = await fetch('/auth/me');
@@ -135,10 +136,12 @@ function votesByPollId(votes) {
 function filterPolls(polls, { viewMode, currentUser, userVotes, followingUsers, activeFilter, searchTerm }) {
   return polls
     .filter(poll => {
+      const hasVoted = userVotes.hasOwnProperty(poll.id) && String(userVotes[poll.id]).length > 0;
+
       if (viewMode === 'Mine') return poll.creator === currentUser;
-      if (viewMode === 'Voted') return userVotes.hasOwnProperty(poll.id) && userVotes[poll.id].length > 0;
-      if (viewMode === 'Following') return followingUsers.includes(poll.creator);
-      return true;
+      if (viewMode === 'Voted') return hasVoted;
+      if (viewMode === 'Following') return followingUsers.includes(poll.creator) && !hasVoted;
+      return !hasVoted;
     })
     .filter(poll => activeFilter === 'All' ? true : poll.category === activeFilter)
     .filter(poll => poll.question.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -197,6 +200,7 @@ function Dashboard() {
   const [votingType, setVotingType] = useState('single');
   const [maxChoices, setMaxChoices] = useState('1');
   const [closeAfterMinutes, setCloseAfterMinutes] = useState('');
+  const [pollPage, setPollPage] = useState(0);
   const [now, setNow] = useState(Date.now());
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
@@ -212,6 +216,11 @@ function Dashboard() {
     activeFilter,
     searchTerm
   });
+  const pollPageCount = Math.max(Math.ceil(filteredPolls.length / POLLS_PER_PAGE), 1);
+  const visiblePolls = filteredPolls.slice(
+    pollPage * POLLS_PER_PAGE,
+    pollPage * POLLS_PER_PAGE + POLLS_PER_PAGE
+  );
 
   useEffect(() => {
     fetchCurrentUser()
@@ -238,10 +247,21 @@ function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (filteredPolls.length > 0 && !filteredPolls.find(poll => poll.id === selectedPollId)) {
-      setSelectedPollId(filteredPolls[0].id);
+    if (pollPage >= pollPageCount) {
+      setPollPage(pollPageCount - 1);
+      return;
     }
-  }, [activeFilter, followingUsers, polls, viewMode]);
+
+    if (visiblePolls.length > 0 && !visiblePolls.find(poll => poll.id === selectedPollId)) {
+      setSelectedPollId(visiblePolls[0].id);
+    } else if (visiblePolls.length === 0) {
+      setSelectedPollId(null);
+    }
+  }, [followingUsers, polls, pollPage, pollPageCount, selectedPollId, userVotes, visiblePolls]);
+
+  useEffect(() => {
+    setPollPage(0);
+  }, [activeFilter, searchMode, searchTerm, viewMode]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -308,6 +328,7 @@ function Dashboard() {
       });
       setPolls([...polls, newPoll]);
       setSelectedPollId(newPoll.id);
+      setPollPage(Math.floor(filteredPolls.length / POLLS_PER_PAGE));
       setQuestion('');
       setOptions(['', '']);
       setVotingType('single');
@@ -601,7 +622,7 @@ const handleVote = async (pollId, optionIndex) => {
 
             <div className="poll-layout">
               <div className="poll-list">
-                {filteredPolls.map((poll) => (
+                {visiblePolls.map((poll) => (
                   <button
                     key={poll.id}
                     type="button"
@@ -614,6 +635,29 @@ const handleVote = async (pollId, optionIndex) => {
                 ))}
                 {filteredPolls.length === 0 && (
                   <p className="empty-state">No polls found.</p>
+                )}
+                {filteredPolls.length > POLLS_PER_PAGE && (
+                  <div className="pagination-controls">
+                    <button
+                      type="button"
+                      className="btn-ghost btn-sm"
+                      onClick={() => setPollPage(Math.max(pollPage - 1, 0))}
+                      disabled={pollPage === 0}
+                    >
+                      Previous
+                    </button>
+                    <span className="pagination-status">
+                      Page {pollPage + 1} of {pollPageCount}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-ghost btn-sm"
+                      onClick={() => setPollPage(Math.min(pollPage + 1, pollPageCount - 1))}
+                      disabled={pollPage >= pollPageCount - 1}
+                    >
+                      Next
+                    </button>
+                  </div>
                 )}
               </div>
 

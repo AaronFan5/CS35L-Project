@@ -81,9 +81,15 @@ test('user can create a poll, vote, and see results update', async ({ page }) =>
 
   await pollDetail.getByRole('button', { name: /Blue\s+0 votes/i }).click();
 
-  await expect(pollDetail.getByRole('button', { name: /Blue\s+1 votes/i })).toBeVisible();
-  await expect(pollDetail.locator('.poll-total')).toHaveText('1 vote');
-  await expect(pollDetail.locator('.chart-row', { hasText: 'Blue' })).toContainText('1 (100%)');
+  await expect(page.locator('.poll-card', { hasText: pollQuestion })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Voted' }).click();
+
+  const votedPollDetail = page.locator('.poll-detail');
+  await expect(page.locator('.poll-card', { hasText: pollQuestion })).toBeVisible();
+  await expect(votedPollDetail.getByRole('button', { name: /Blue\s+1 votes/i })).toBeVisible();
+  await expect(votedPollDetail.locator('.poll-total')).toHaveText('1 vote');
+  await expect(votedPollDetail.locator('.chart-row', { hasText: 'Blue' })).toContainText('1 (100%)');
 });
 
 test('user can follow another user and see their polls in the following feed', async ({ page }) => {
@@ -130,4 +136,28 @@ test('user can search polls by question text', async ({ page }) => {
   await expect(page.locator('.poll-card', { hasText: hiddenQuestion })).toHaveCount(0);
   await visiblePollCard.click();
   await expect(page.locator('.poll-detail').getByRole('heading', { name: visibleQuestion })).toBeVisible();
+});
+
+test('user can page through poll results ten at a time', async ({ page }) => {
+  await signUp(page);
+
+  const pollGroup = `E2E paged polls ${uniqueSuffix()}`;
+  for (let index = 1; index <= 11; index++) {
+    await createPoll(page, `${pollGroup} ${String(index).padStart(2, '0')}`, 'Option A', 'Option B');
+  }
+
+  const searchInput = page.getByPlaceholder('Search polls...');
+  await expect(searchInput).toBeEditable();
+  await searchInput.fill(pollGroup);
+
+  await expect(page.locator('.poll-card')).toHaveCount(10);
+  await expect(page.locator('.pagination-status')).toHaveText('Page 1 of 2');
+  await expect(page.locator('.poll-card', { hasText: `${pollGroup} 01` })).toBeVisible();
+  await expect(page.locator('.poll-card', { hasText: `${pollGroup} 11` })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Next' }).click();
+
+  await expect(page.locator('.poll-card')).toHaveCount(1);
+  await expect(page.locator('.pagination-status')).toHaveText('Page 2 of 2');
+  await expect(page.locator('.poll-card', { hasText: `${pollGroup} 11` })).toBeVisible();
 });

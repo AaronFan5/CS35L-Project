@@ -392,6 +392,20 @@ label {
 
 .poll-list { display: flex; flex-direction: column; gap: 8px; }
 
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.pagination-status {
+  color: #5f5f5d;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
 .poll-card {
   display: block;
   width: 100%;
