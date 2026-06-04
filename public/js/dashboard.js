@@ -161,6 +161,24 @@ function formatTimeRemaining(closesAt, now) {
   return `${seconds}s`;
 }
 
+function PollDonut({options}){
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    const chart = new Chart (ref.current, {
+      type: 'doughnut',
+      data: {
+        labels: options.map(o => o.text),
+        datasets: [{data: options.map(o => o.votes)}],
+      },
+      options: {
+        plugins: { legend: {position: 'bottom'} },
+      },
+    });
+    return () => chart.destroy();
+  }, [options]);
+  return <canvas ref={ref} width={200} height={200}></canvas>;
+      }
+
 function Dashboard() {
   const [currentUser, setCurrentUser] = useState('');
   const [polls, setPolls] = useState([]);
@@ -437,6 +455,7 @@ const handleVote = async (pollId, optionIndex) => {
     const highestVoteCount = Math.max(...poll.options.map((o) => o.votes), 1);
     const totalVotes = poll.options.reduce((sum, o) => sum + o.votes, 0);
     return (
+      <React.Fragment>
       <div className="poll-chart">
         <div className="poll-total">{totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}</div>
         {poll.options.map((option, index) => {
@@ -452,6 +471,8 @@ const handleVote = async (pollId, optionIndex) => {
           );
         })}
       </div>
+      <PollDonut options={poll.options} />
+      </React.Fragment>
     );
   };
 
