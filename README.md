@@ -34,6 +34,7 @@ For a full setup walkthrough (including creating the Supabase project and schema
 - **Follow users** — Search for users, follow/unfollow them, and view polls from followed users in a dedicated feed.
 - **Poll status controls** — Poll creators can close, reopen, and delete their own polls. Voting records cascade automatically when a poll is deleted.
 - **Timed polls** — Poll creators can set polls to close automatically after 10 minutes, 1 hour, 6 hours, or 1 day.
+- **Comments** - Users can add comments to polls to share their thoughts.
 
 ## Tech stack
 
