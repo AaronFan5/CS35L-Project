@@ -24,10 +24,10 @@ For a full setup walkthrough (including creating the Supabase project and schema
 
 ## Features
 
-- **Authentication** — Sign up, log in, and log out with JWT-based sessions stored in HTTP-only cookies. Authenticated routes protect poll creation, voting, user follows, and account-specific dashboard data.
+- **Authentication** — Sign up, log in, and log out with bcrypt password hashing and JWT-based sessions stored in HTTP-only cookies. Authenticated routes protect poll creation, voting, user follows, and account-specific dashboard data.
 - **Create polls** — Any logged-in user can create a poll with a question, multiple options, category, voting type, and optional timer.
 - **Vote** — Users can vote in single-choice, multiple-choice, and ranked-choice polls. Single-choice votes can be changed or removed, multiple-choice votes can be toggled, and ranked polls store ranked selections.
-- **Live results** — Each poll displays a horizontal bar chart with vote counts and percentages after voting.
+- **Live results** — Each poll displays vote counts, percentages, a horizontal bar chart, and a Chart.js doughnut chart after voting.
 - **Search** — Search polls by question text and search users by username.
 - **Filter by category** — Pill-shaped category chips filter the poll list (All / Food / Location / Opinion).
 - **View modes** — Tabs switch between All polls, Following, Mine (polls you created), and Voted (polls you've voted on).
@@ -39,10 +39,10 @@ For a full setup walkthrough (including creating the Supabase project and schema
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18 (via CDN with Babel Standalone) |
+| Frontend | React 18 (via CDN with Babel Standalone), Chart.js |
 | Backend | Node.js + Express |
 | Database | Supabase (hosted PostgreSQL) |
-| Auth | JWT in HTTP-only cookies |
+| Auth | bcrypt password hashing, JWT in HTTP-only cookies |
 | Testing | Playwright (end-to-end) |
 
 ## Architecture
@@ -56,7 +56,7 @@ graph LR
   Express -->|requireAuth middleware| Protected["Protected poll/user routes"]
 ```
 
-The frontend is a set of static HTML pages served by Express. Each page loads a React component over CDN that talks to the Express API via `fetch`. Express verifies the JWT cookie on protected routes and proxies data operations to Supabase. Supabase stores users, follow relationships, polls, poll options, votes, ranked choices, poll status, and timers.
+The frontend is a set of static HTML pages served by Express. Each page loads React over CDN, uses Chart.js for doughnut chart result visualization, and talks to the Express API via `fetch`. Express verifies the JWT cookie on protected routes and proxies data operations to Supabase. Supabase stores users, hashed passwords, follow relationships, polls, poll options, votes, ranked choices, poll status, and timers.
 
 ### Auth flow
 ```mermaid
@@ -67,8 +67,14 @@ sequenceDiagram
   participant DB as Supabase
   U->>C: enter username + password
   C->>S: POST /auth/login
-  S->>DB: SELECT user by username and password
+  S->>DB: SELECT user by username
   DB-->>S: user row
+  alt stored password is bcrypt hash
+    S->>S: bcrypt.compare password with stored hash
+  else legacy plaintext password
+    S->>S: compare password with legacy value
+    S->>DB: UPDATE password to bcrypt hash
+  end
   S->>S: sign JWT with username
   S-->>C: Set-Cookie token=JWT (HTTP-only)
   C->>S: GET /auth/me (cookie sent automatically)
@@ -201,4 +207,4 @@ CS35L-Project/
 
 The app requires authentication for creating polls, voting, following users, reading the current user's votes, and changing owned polls. Sessions are represented by signed JWTs stored in HTTP-only cookies.
 
-Passwords are currently stored directly in the `users.password` column and compared during login. For production use, this should be changed to password hashing with a library such as bcrypt.
+Passwords are hashed with bcrypt before storage. Login supports older plaintext-password accounts by checking the legacy value once, then replacing it with a bcrypt hash after a successful login.
