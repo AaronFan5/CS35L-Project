@@ -1,4 +1,5 @@
 const pollService = require('../services/pollService');
+
 const {
   validateCreatePollInput,
   normalizeCreatePollInput,
@@ -87,11 +88,40 @@ async function togglePollStatus(req, res) {
   }
 }
 
+async function getPollComments(req, res) {
+  try {
+    const comments = await pollService.getPollComments(req.params.id);
+    res.json(comments);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+async function addComment(req, res) {
+  try{
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ message: 'You must enter a message' });
+    }
+
+    const newComment = await pollService.addComment({
+      pollId: req.params.id,
+      username: req.user.username,
+      message: message.trim()
+    });
+    res.json(newComment);
+  } catch(error){
+    res.status(500).json({ message: error.message });
+  }
+}
+
 module.exports = {
   getAllPolls,
   getUserVotes,
   createPoll,
   deletePoll,
   voteOnPoll,
-  togglePollStatus
+  togglePollStatus,
+  getPollComments,
+  addComment
 };

@@ -508,11 +508,39 @@ async function togglePollStatus(pollId, username) {
     return await getPollById(pollId);
 }
 
+async function addComment({ pollId, username, message }) {
+  const {data, error} = await supabase
+    .from('comments')
+    .insert({
+      poll_id: pollId,
+      username,
+      message
+    })
+    .select('*')
+    .single();
+
+  if(error) throw error;
+    return data;
+}
+
+async function getPollComments(pollId) {
+  const {data, error} = await supabase
+    .from('comments')
+    .select('*')
+    .eq('poll_id', pollId)
+    .order('created_at', { ascending: true });
+
+  if(error) throw error;
+    return data;
+}
+
 module.exports = {
   createPoll,
   getAllPolls,
   getUserVotes,
   voteOnPoll,
   deletePoll,
-  togglePollStatus
+  togglePollStatus,
+  getPollComments,
+  addComment
 };

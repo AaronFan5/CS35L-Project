@@ -13,6 +13,8 @@ router.get('/user-votes', pollController.getUserVotes);
 router.post('/create', pollController.createPoll);
 router.delete('/:id', pollController.deletePoll);
 router.post('/vote', pollController.voteOnPoll);
+router.get('/:id/comments', pollController.getPollComments);
+router.post('/:id/comments', pollController.addComment);
 
 router.post('/toggle-status', pollController.togglePollStatus); 
 

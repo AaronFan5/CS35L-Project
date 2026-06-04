@@ -202,6 +202,8 @@ function Dashboard() {
   const [closeAfterMinutes, setCloseAfterMinutes] = useState('');
   const [pollPage, setPollPage] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState('');
 
   const selectedPoll = polls.find((poll) => poll.id === selectedPollId);
   const selectedPollIsOpen = selectedPoll
@@ -262,6 +264,17 @@ function Dashboard() {
   useEffect(() => {
     setPollPage(0);
   }, [activeFilter, searchMode, searchTerm, viewMode]);
+
+  useEffect(() => {
+    if(!selectedPollId) {
+      setComments([]);
+      return;
+    }
+    fetch(`/polls/${selectedPollId}/comments`)
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => setComments(data))
+      .catch((err) => console.error('Failed to fetch comments:', err));
+    }, [selectedPollId]);
 
   useEffect(() => {
     const intervalId = setInterval(() => {
@@ -442,6 +455,34 @@ const handleVote = async (pollId, optionIndex) => {
       alert(error.message);
     }
   };
+
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    if(!newComment.trim()) {
+      alert('Please enter a comment message.');
+      return;
+    }
+
+    try{
+      const response = await fetch(`/polls/${selectedPollId}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: newComment })
+    });
+
+    if (!response.ok) {
+      alert('Failed to add comment');
+      return;
+    }
+
+    const res = await fetch(`/polls/${selectedPollId}/comments`);
+    const updatedComments = await res.json();
+    setComments(updatedComments);
+    setNewComment('');
+    } catch (error) {
+      alert(error.message);
+    }
+  }
 
   const toggleFollow = async (username) => {
     const isFollowing = followingUsers.includes(username);
@@ -731,7 +772,31 @@ const handleVote = async (pollId, optionIndex) => {
                       );
                     })}
                   </div>
-                  {renderPollChart(selectedPoll)}
+                {renderPollChart(selectedPoll)}
+
+                  <div className="comments-section">
+                    <h3>Comments</h3>
+                    <div className="comments-list">
+                      {comments.map((comment) => (
+                        <div key={comment.id} className="comment">
+                          <strong>@{comment.username}</strong>
+                          <p>{comment.message}</p>
+                        </div>
+                      ))}
+                      {comments.length === 0 && (
+                        <p className="empty-state">No comments yet. Be the first to say something!</p>
+                      )}
+                    </div>
+                      <form onSubmit={handleAddComment} className="comment-input" style={{ display: 'flex', gap: '8px', marginTop: '12px' }}> 
+                      <input
+                        type="text"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                      />
+                      <button type="submit">Post</button>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>
