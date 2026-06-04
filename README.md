@@ -1,6 +1,6 @@
 # Polls — UCLA Polling App
 
-A web app where UCLA students can create polls, vote on each other's polls, and see results update in real time. 
+A web app where UCLA students can create polls, vote on each other's polls, and see results update immediately after each action.
 
 ## Quick start (Run the Express server)
 
@@ -27,7 +27,7 @@ For a full setup walkthrough (including creating the Supabase project and schema
 - **Authentication** — Sign up, log in, and log out with bcrypt password hashing and JWT-based sessions stored in HTTP-only cookies. Authenticated routes protect poll creation, voting, user follows, and account-specific dashboard data.
 - **Create polls** — Any logged-in user can create a poll with a question, multiple options, category, voting type, and optional timer.
 - **Vote** — Users can vote in single-choice, multiple-choice, and ranked-choice polls. Single-choice votes can be changed or removed, multiple-choice votes can be toggled, and ranked polls store ranked selections.
-- **Live results** — Each poll displays vote counts, percentages, a horizontal bar chart, and a Chart.js doughnut chart after voting.
+- **Live results** — Each poll displays vote counts, percentages, a horizontal bar chart, and a Chart.js doughnut chart that updates after voting.
 - **Search** — Search polls by question text and search users by username.
 - **Filter by category** — Pill-shaped category chips filter the poll list (All / Food / Location / Opinion).
 - **View modes** — Tabs switch between All polls, Following, Mine (polls you created), and Voted (polls you've voted on).
@@ -147,6 +147,7 @@ The test suite covers:
 2. **Poll lifecycle** — create a poll, vote on it, verify the vote count updates
 3. **Following flow** — follow another user and verify their poll appears in the Following feed
 4. **Search flow** — search polls by question text and verify the visible results update
+5. **Pagination flow** — create enough polls to span multiple pages and verify next-page navigation
 
 The tests create unique usernames and poll questions on each run so they can be run repeatedly against the same Supabase project.
 
